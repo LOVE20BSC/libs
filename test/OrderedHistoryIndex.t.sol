@@ -53,6 +53,8 @@ contract OrderedHistoryIndexTest {
         try harness.recordKey(15) {
             revert("expected InvalidKeyOrder");
         } catch (bytes memory reason) {
+            // The revert payload is checked to contain at least four bytes by the test harness.
+            // forge-lint: disable-next-line(unsafe-typecast)
             require(bytes4(reason) == OrderedHistoryIndex.InvalidKeyOrder.selector);
         }
         require(harness.length() == 2);
@@ -60,6 +62,8 @@ contract OrderedHistoryIndexTest {
 
     function testBinarySearchLongIndex() external {
         OrderedHistoryIndexHarness harness = new OrderedHistoryIndexHarness();
+        // The loop intentionally exercises a long ordered index through the external harness.
+        // forge-lint: disable-next-line(calls-loop)
         for (uint256 i = 1; i <= 64; ++i) harness.recordKey(i * 10);
         require(harness.length() == 64);
         (bool found, uint256 key) = harness.nearest(1);
