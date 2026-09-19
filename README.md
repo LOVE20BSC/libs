@@ -10,6 +10,23 @@
 - `nearest(uint256 key)` - Find the largest recorded key <= target
 - `latest()` - Get the most recent key
 
+## Pagination
+
+Shared pagination window used by every collection getter. A page is described by `(uint256 offset, uint256 limit, bool reverse)` and returned together with the real total count.
+
+**Window semantics:**
+- `offset` skips entries from the end the reading starts at: a forward page skips the oldest entries, a reversed page skips the newest ones — the same `offset` trims opposite ends under the two directions. An `offset` past the end returns an empty page and the real total count, never a revert.
+- `limit` above the remaining items returns the remainder.
+- `limit = 0` returns an empty page; this is how callers read the total count when there is no separate counter getter.
+- `reverse = true` walks from the newest item backwards.
+
+**API:**
+- `paginateIndices(uint256 total, uint256 offset, uint256 limit, bool reverse)` - Source indices only; the caller reads whatever it needs from them. Use this when the element type is not `uint256`/`address` (structs, parallel arrays, extracted fields).
+- `paginate(uint256[] storage items, uint256 offset, uint256 limit, bool reverse)` - Page of a `uint256[]` storage array.
+- `paginate(address[] storage items, uint256 offset, uint256 limit, bool reverse)` - Page of an `address[]` storage array.
+
+The two `paginate` overloads return `(page, total)`; the window math lives once in the private helpers, so the different element types only differ in what they copy out.
+
 ## RoundHistory*
 
 Complete history tracking systems built on top of `OrderedHistoryIndex`. Each type manages both the index and typed value storage.
