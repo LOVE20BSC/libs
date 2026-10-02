@@ -3,23 +3,29 @@ pragma solidity =0.8.37;
 
 /**
  * @title Pagination
- * @notice 通用分页库，支持索引分页和类型化数组分页
- * @dev 提供三种使用方式：
- *      1. paginateIndices - 仅返回索引，由调用者自行获取数据
- *      2. paginate(uint256[] storage) - uint256 数组直接分页
- *      3. paginate(address[] storage) - address 数组直接分页
- *      窗口语义：越界返回空数组不回滚；limit 超过剩余量按剩余量返回；limit = 0 只取总数（返回空数组）。
- *      offset 从读取方向的起始端跳过指定项数——正序跳过最旧的，逆序跳过最新的——同一 offset 在两种方向下
- *      跳过的是集合的两端。元素不是 uint256/address 时，用 paginateIndices 取下标后自行取值。
+ * @notice Generic pagination library supporting index pagination and typed array pagination
+ * @dev Three ways to use it:
+ *      1. paginateIndices - returns the source indices only; the caller fetches the data
+ *      2. paginate(uint256[] storage) - paginate a uint256 array directly
+ *      3. paginate(address[] storage) - paginate an address array directly
+ *      Window semantics: an out-of-range window returns an empty array and does not revert; a
+ *      `limit` above the remaining count returns the remaining count; `limit = 0` returns an
+ *      empty page (the overloads that also return `total` still return the real total).
+ *      `offset` skips that many items from the end the read starts at - forward skips the
+ *      oldest, reverse skips the newest - so the same `offset` skips one end or the other
+ *      depending on direction. For element types other than uint256/address, use
+ *      `paginateIndices` to get the indices and fetch the values yourself.
  */
 library Pagination {
     /**
-     * @notice 纯索引分页 - 返回源数组下标，由调用者自行获取数据
-     * @param total 总数量
-     * @param offset 偏移量（从 0 开始；跳过读取起始端的 offset 项：正序跳过最旧的，逆序跳过最新的）
-     * @param limit 每页数量（超过剩余量按剩余量返回；传 0 返回空数组）
-     * @param reverse 是否逆序（true = 从最新到最旧）
-     * @return indices 源数组下标数组
+     * @notice Index-only pagination - returns the source array indices; the caller fetches the data
+     * @param total Total number of items
+     * @param offset Offset (0-based; skips `offset` items from the end the read starts at: forward
+     *        skips the oldest, reverse skips the newest)
+     * @param limit Page size (above the remaining count returns the remaining count; 0 returns an
+     *        empty array)
+     * @param reverse Whether to walk backwards (true = newest to oldest)
+     * @return indices The source array indices
      */
     function paginateIndices(uint256 total, uint256 offset, uint256 limit, bool reverse)
         internal
@@ -34,13 +40,15 @@ library Pagination {
     }
 
     /**
-     * @notice uint256[] 数组分页
-     * @param items 存储数组
-     * @param offset 偏移量（从 0 开始；跳过读取起始端的 offset 项：正序跳过最旧的，逆序跳过最新的）
-     * @param limit 每页数量（超过剩余量按剩余量返回；传 0 返回空数组）
-     * @param reverse 是否逆序
-     * @return result 分页结果
-     * @return total 总数量
+     * @notice Paginate a uint256[] array
+     * @param items The storage array
+     * @param offset Offset (0-based; skips `offset` items from the end the read starts at: forward
+     *        skips the oldest, reverse skips the newest)
+     * @param limit Page size (above the remaining count returns the remaining count; 0 returns an
+     *        empty array)
+     * @param reverse Whether to walk backwards
+     * @return result The page
+     * @return total Total number of items
      */
     function paginate(uint256[] storage items, uint256 offset, uint256 limit, bool reverse)
         internal
@@ -56,13 +64,15 @@ library Pagination {
     }
 
     /**
-     * @notice address[] 数组分页
-     * @param items 存储数组
-     * @param offset 偏移量（从 0 开始；跳过读取起始端的 offset 项：正序跳过最旧的，逆序跳过最新的）
-     * @param limit 每页数量（超过剩余量按剩余量返回；传 0 返回空数组）
-     * @param reverse 是否逆序
-     * @return result 分页结果
-     * @return total 总数量
+     * @notice Paginate an address[] array
+     * @param items The storage array
+     * @param offset Offset (0-based; skips `offset` items from the end the read starts at: forward
+     *        skips the oldest, reverse skips the newest)
+     * @param limit Page size (above the remaining count returns the remaining count; 0 returns an
+     *        empty array)
+     * @param reverse Whether to walk backwards
+     * @return result The page
+     * @return total Total number of items
      */
     function paginate(address[] storage items, uint256 offset, uint256 limit, bool reverse)
         internal
@@ -78,7 +88,8 @@ library Pagination {
     }
 
     /**
-     * @notice 窗口大小：offset 越界时为空，否则取 limit 与剩余量的较小值（limit 为 0 也落在这里）
+     * @notice Window size: empty when `offset` is out of range, otherwise the smaller of `limit`
+     *         and the remaining count (`limit = 0` also lands here)
      */
     function _pageSize(uint256 total, uint256 offset, uint256 limit) private pure returns (uint256) {
         if (offset >= total) {
@@ -89,7 +100,8 @@ library Pagination {
     }
 
     /**
-     * @notice 页内第 i 项对应的源下标：逆序时从最新一端倒着走
+     * @notice Source index of item `i` within the page: walks backwards from the newest end when
+     *         `reverse` is set
      */
     function _sourceIndex(uint256 total, uint256 offset, uint256 i, bool reverse)
         private
