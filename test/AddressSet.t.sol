@@ -393,10 +393,13 @@ contract AddressSetTest {
     /// Upper bound on the number of operations per state-machine run.
     uint256 private constant MAX_STEPS = 24;
     /// Full-width address used by the extreme-element tests.
-    address private constant MAX_VAL = address(uint160(type(uint256).max));
+    address private constant MAX_VAL = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
 
-    /// Wrap a raw word into the element domain.
+    /// Wrap a raw word into the element domain. The `uint160` narrowing is the point, not a
+    /// hazard: the element domain is exactly the 160-bit address space, so no information the
+    /// tests rely on is lost by the cast.
     function _val(uint256 v) private pure returns (address) {
+        // forge-lint: disable-next-line(unsafe-typecast)
         return address(uint160(v));
     }
 

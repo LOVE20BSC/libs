@@ -40,6 +40,19 @@ Membership and position share one mapping `indexPlusOne`, encoding `index + 1` s
 - `count()` - Number of elements
 - `values(uint256 offset, uint256 limit, bool reverse)` - Paginated page and real total
 
+## AddressSet
+
+The `address`-keyed sibling of `Uint256Set`: same sentinel encoding, same swap-and-pop removal, same pagination-only enumeration. An unbounded set of `address` values with O(1) membership, deduplicated on insert. Removal is swap-and-pop: the last element is moved into the removed slot, so **the order of `items` is not stable across calls** — the same `offset` may return different elements after a removal, and `reverse` means "walk the current storage order backwards", not "newest insert first". Enumeration goes through `Pagination` only: there is no whole-set getter and no `AtIndex` accessor. `contains` and `count` are O(1) point lookups rather than a second enumeration path; `count` returns the same total that `values` reports.
+
+Membership and position share one mapping `indexPlusOne`, encoding `index + 1` so that `0` means "absent".
+
+**API:**
+- `add(address value)` - Insert; no-op if already present
+- `remove(address value)` - Swap-and-pop removal; no-op if absent
+- `contains(address value)` - O(1) membership check
+- `count()` - Number of elements
+- `values(uint256 offset, uint256 limit, bool reverse)` - Paginated page and real total
+
 ## RoundHistory*
 
 Complete history tracking systems built on top of `OrderedHistoryIndex`. Each type manages both the index and typed value storage.
@@ -99,5 +112,7 @@ All `RoundHistory*` libraries share the same core pattern:
 This design eliminates code duplication—the index management logic exists once in `OrderedHistoryIndex`, and each history type only adds the value storage and type-specific operations.
 
 `RoundHistoryUint256Set` extends the same pattern to a set: the index histories are keyed by slot (`slotHistory`) and by element (`indexPlusOneHistory`), with `countHistory` holding the size. `latestValue()` is O(1) (it reads the last recorded key), so the current state needs no extra copy; only `value(round)` for a past round falls back to `nearest()`.
+
+`AddressSet` applies the same shape to plain (non-historical) `address` membership: it is the element-type sibling of `Uint256Set`, with the sentinel encoding and swap-and-pop removal shared by construction and only the element type differing.
 
 Collections here expose every enumeration through `Pagination` and never through a whole-set getter, matching the collection-read rule that a single collection keeps exactly one complete read path. Scalar `contains`/`count` are O(1) reads of the latest recorded value; their `*ByRound` forms are point queries that are O(1) on an exact round hit and O(log rounds) otherwise (`nearest()` binary search). None of them is a second enumeration path.
