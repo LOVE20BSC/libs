@@ -86,6 +86,24 @@ Tracks `address` values across rounds.
 - `value(uint256 round)` - Get address at round
 - `latestValue()` - Get the most recent address
 
+### RoundHistoryUint256Array
+
+Tracks `uint256[]` values across rounds, for per-round configuration arrays such as secondary-distribution recipients and ratios. Recording an empty array is a regular record — it is how a round explicitly clears the value; rounds without a record inherit the latest earlier record, and `values()` returns an empty array when no earlier record exists.
+
+**API:**
+- `record(uint256 round, uint256[] values)` - Record the round's values; re-recording the latest round overwrites it
+- `values(uint256 round)` - Values as of a round (nearest earlier record if absent)
+- `latestValues()` - Most recent recorded values
+
+### RoundHistoryStringArray
+
+Tracks `string[]` values across rounds, with the same inheritance semantics as `RoundHistoryUint256Array` (`remarks` arrays are the current consumer).
+
+**API:**
+- `record(uint256 round, string[] values)` - Record the round's values; re-recording the latest round overwrites it
+- `values(uint256 round)` - Values as of a round (nearest earlier record if absent)
+- `latestValues()` - Most recent recorded values
+
 ### RoundHistoryUint256Set
 
 Tracks a **set** of `uint256` values across rounds, replacing the legacy `RoundHistoryAddressSet` with `uint256` elements. Three histories are kept: the set size, `slot -> element`, and `element -> slot + 1` (`0` meaning "not in the set"). The current state is derived from these histories' `latestValue()`, so there is no second copy that could drift out of sync.
