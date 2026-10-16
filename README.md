@@ -4,11 +4,13 @@
 
 `OrderedHistoryIndex` stores ordered change-point keys. New keys must increase; re-recording the latest key is allowed, while older keys revert. Values remain in the consuming contract's typed storage.
 
+`nearest` and `latest` return `(bool found, uint256 key)`. `found = false` means no recorded key satisfies the query — an empty index, or a target below the first key — which is what lets the typed histories tell "no record" apart from a recorded zero.
+
 **API:**
-- `record(uint256 key)` - Record a new key (must be >= last key)
+- `record(uint256 key)` - Record a new key (must be >= last key; older keys revert with `InvalidKeyOrder`)
 - `contains(uint256 key)` - Check if a key was recorded
-- `nearest(uint256 key)` - Find the largest recorded key <= target
-- `latest()` - Get the most recent key
+- `nearest(uint256 key)` - Largest recorded key <= target, plus a `found` flag
+- `latest()` - Most recent key, plus a `found` flag
 
 ## Pagination
 
@@ -70,7 +72,7 @@ Tracks `uint256` values across rounds with arithmetic operations.
 - `value(uint256 round)` - Get value at round (uses nearest if not exact)
 - `latestValue()` - Get the most recent value
 - `increase(uint256 round, uint256 amount)` - Add to current value
-- `decrease(uint256 round, uint256 amount)` - Subtract from current value
+- `decrease(uint256 round, uint256 amount)` - Subtract from current value; reverts if the current value is smaller than `amount`
 
 ### RoundHistoryString
 
