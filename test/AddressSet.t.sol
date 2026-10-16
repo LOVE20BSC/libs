@@ -20,12 +20,12 @@ contract AddressSetHarness {
 
     AddressSet.Storage private _set;
 
-    function add(address value) external {
-        _set.add(value);
+    function add(address value) external returns (bool) {
+        return _set.add(value);
     }
 
-    function remove(address value) external {
-        _set.remove(value);
+    function remove(address value) external returns (bool) {
+        return _set.remove(value);
     }
 
     function contains(address value) external view returns (bool) {
@@ -97,6 +97,19 @@ contract AddressSetTest {
         require(total == 1);
         require(page.length == 1);
         require(page[0] == _val(7));
+    }
+
+    function testAddRemoveReportWhetherTheSetChanged() external {
+        AddressSetHarness harness = new AddressSetHarness();
+
+        require(!harness.remove(_val(7))); // absent: no change
+        require(harness.add(_val(7))); // first insert: changed
+        require(!harness.add(_val(7))); // duplicate: no change
+        require(harness.remove(_val(7))); // present: changed
+        require(!harness.remove(_val(7))); // already gone: no change
+
+        require(harness.count() == 0);
+        require(!harness.contains(_val(7)));
     }
 
     function testRemoveAbsentIsNoop() external {

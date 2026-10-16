@@ -34,11 +34,13 @@ An unbounded set of `uint256` values with O(1) membership, deduplicated on inser
 Membership and position share one mapping `indexPlusOne`, encoding `index + 1` so that `0` means "absent".
 
 **API:**
-- `add(uint256 value)` - Insert; no-op if already present
-- `remove(uint256 value)` - Swap-and-pop removal; no-op if absent
+- `add(uint256 value)` - Insert; returns whether the element was actually inserted (`false` when already present, no state change)
+- `remove(uint256 value)` - Swap-and-pop removal; returns whether the element was actually removed (`false` when absent, no state change, no revert)
 - `contains(uint256 value)` - O(1) membership check
 - `count()` - Number of elements
 - `values(uint256 offset, uint256 limit, bool reverse)` - Paginated page and real total
+
+The two `bool` returns are the set's idempotence signal: group-chat's member list and ban list write through `listed ? set.add(id) : set.remove(id)` and emit their event only when that returns `true`, rather than testing membership beforehand. `add` always leaves the element present, so the return answers "did this call change the set", not "did it succeed".
 
 ## AddressSet
 
@@ -47,11 +49,13 @@ The `address`-keyed sibling of `Uint256Set`: same sentinel encoding, same swap-a
 Membership and position share one mapping `indexPlusOne`, encoding `index + 1` so that `0` means "absent".
 
 **API:**
-- `add(address value)` - Insert; no-op if already present
-- `remove(address value)` - Swap-and-pop removal; no-op if absent
+- `add(address value)` - Insert; returns whether the element was actually inserted (`false` when already present, no state change)
+- `remove(address value)` - Swap-and-pop removal; returns whether the element was actually removed (`false` when absent, no state change, no revert)
 - `contains(address value)` - O(1) membership check
 - `count()` - Number of elements
 - `values(uint256 offset, uint256 limit, bool reverse)` - Paginated page and real total
+
+The two `bool` returns carry the same idempotence signal as `Uint256Set`: `add` always leaves the element present, so the return answers "did this call change the set", not "did it succeed".
 
 ## RoundHistory*
 
@@ -134,3 +138,11 @@ This design eliminates code duplication—the index management logic exists once
 `AddressSet` applies the same shape to plain (non-historical) `address` membership: it is the element-type sibling of `Uint256Set` — same sentinel encoding and swap-and-pop removal, kept identical by construction, with only the element type differing. The two files are deliberate mirrors rather than one shared generic, so keeping them behaviorally identical is a maintenance obligation: any change to the sentinel, removal, or pagination semantics of one must be mirrored in the other in the same change.
 
 Collections here expose every enumeration through `Pagination` and never through a whole-set getter, matching the collection-read rule that a single collection keeps exactly one complete read path. Scalar `contains`/`count` are O(1) reads of the latest recorded value; their `*ByRound` forms are point queries that are O(1) on an exact round hit and O(log rounds) otherwise (`nearest()` binary search). None of them is a second enumeration path.
+
+## Build and lint gate
+
+`forge lint` is a build gate here, as in core and action: the post-build lint step fails on any finding, so a clean `forge build` implies a clean lint. Production sources are linted in full.
+
+`[lint] ignore` covers `test/**/*.sol` only. The harnesses expose the set API verbatim, and the state-machine and differential loops call `add` / `remove` for their state effects alone, dropping the `bool` return; without the ignore those call sites raise `unused-return` and the build fails.
+
+One difference from the sibling repos: core, action and group-chat also `exclude_lints` `unused-return`, which switches that rule off for their production sources too. Here it stays on for `src`, and only test files are skipped.

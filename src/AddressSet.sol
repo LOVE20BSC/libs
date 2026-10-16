@@ -25,23 +25,30 @@ library AddressSet {
     }
 
     /**
-     * @notice Insert an element; a no-op (no state change, no new slot) if already present
+     * @notice Insert an element
+     * @return added Whether the element was actually inserted; a no-op (no state change, no new
+     *         slot, `false`) if already present. Callers that need idempotent side effects (event
+     *         emission, operator bookkeeping) must branch on this instead of testing membership
+     *         beforehand.
      */
-    function add(Storage storage self, address value) internal {
-        if (self.indexPlusOne[value] != 0) return;
+    function add(Storage storage self, address value) internal returns (bool added) {
+        if (self.indexPlusOne[value] != 0) return false;
 
         self.items.push(value);
         self.indexPlusOne[value] = self.items.length;
+        return true;
     }
 
     /**
-     * @notice Swap-and-pop removal; a no-op (no state change, no revert) if absent
+     * @notice Swap-and-pop removal
      * @dev Invariant: whenever `indexPlusOne[value] != 0` that value lives in `items`, hence
      *      `items.length >= 1`, so the `items.length - 1` below cannot underflow.
+     * @return removed Whether the element was actually removed; a no-op (no state change, no
+     *         revert, `false`) if absent
      */
-    function remove(Storage storage self, address value) internal {
+    function remove(Storage storage self, address value) internal returns (bool removed) {
         uint256 slot = self.indexPlusOne[value];
-        if (slot == 0) return;
+        if (slot == 0) return false;
 
         uint256 removedIndex = slot - 1;
         uint256 lastIndex = self.items.length - 1;
@@ -52,6 +59,7 @@ library AddressSet {
         }
         self.items.pop();
         delete self.indexPlusOne[value];
+        return true;
     }
 
     /**

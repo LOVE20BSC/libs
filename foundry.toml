@@ -13,3 +13,4 @@ deny = "warnings"
 
 [lint]
 severity = ["high", "med", "low"]
+ignore = ["test/**/*.sol"]

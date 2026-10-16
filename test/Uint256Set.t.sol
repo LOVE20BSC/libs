@@ -20,12 +20,12 @@ contract Uint256SetHarness {
 
     Uint256Set.Storage private _set;
 
-    function add(uint256 value) external {
-        _set.add(value);
+    function add(uint256 value) external returns (bool) {
+        return _set.add(value);
     }
 
-    function remove(uint256 value) external {
-        _set.remove(value);
+    function remove(uint256 value) external returns (bool) {
+        return _set.remove(value);
     }
 
     function contains(uint256 value) external view returns (bool) {
@@ -97,6 +97,19 @@ contract Uint256SetTest {
         require(total == 1);
         require(page.length == 1);
         require(page[0] == 7);
+    }
+
+    function testAddRemoveReportWhetherTheSetChanged() external {
+        Uint256SetHarness harness = new Uint256SetHarness();
+
+        require(!harness.remove(7)); // absent: no change
+        require(harness.add(7)); // first insert: changed
+        require(!harness.add(7)); // duplicate: no change
+        require(harness.remove(7)); // present: changed
+        require(!harness.remove(7)); // already gone: no change
+
+        require(harness.count() == 0);
+        require(!harness.contains(7));
     }
 
     function testRemoveAbsentIsNoop() external {
