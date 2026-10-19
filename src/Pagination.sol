@@ -7,10 +7,10 @@ library Pagination {
         pure
         returns (uint256[] memory indices)
     {
-        uint256 count = _pageSize(total, offset, limit);
+        uint256 count = pageCount(total, offset, limit);
         indices = new uint256[](count);
         for (uint256 i = 0; i < count; i++) {
-            indices[i] = _sourceIndex(total, offset, i, reverse);
+            indices[i] = pageIndex(total, offset, i, reverse);
         }
     }
 
@@ -20,10 +20,10 @@ library Pagination {
         returns (uint256[] memory result, uint256 total)
     {
         total = items.length;
-        uint256 count = _pageSize(total, offset, limit);
+        uint256 count = pageCount(total, offset, limit);
         result = new uint256[](count);
         for (uint256 i = 0; i < count; i++) {
-            result[i] = items[_sourceIndex(total, offset, i, reverse)];
+            result[i] = items[pageIndex(total, offset, i, reverse)];
         }
     }
 
@@ -33,14 +33,14 @@ library Pagination {
         returns (address[] memory result, uint256 total)
     {
         total = items.length;
-        uint256 count = _pageSize(total, offset, limit);
+        uint256 count = pageCount(total, offset, limit);
         result = new address[](count);
         for (uint256 i = 0; i < count; i++) {
-            result[i] = items[_sourceIndex(total, offset, i, reverse)];
+            result[i] = items[pageIndex(total, offset, i, reverse)];
         }
     }
 
-    function _pageSize(uint256 total, uint256 offset, uint256 limit) private pure returns (uint256) {
+    function pageCount(uint256 total, uint256 offset, uint256 limit) internal pure returns (uint256) {
         if (offset >= total) {
             return 0;
         }
@@ -48,8 +48,8 @@ library Pagination {
         return remaining < limit ? remaining : limit;
     }
 
-    function _sourceIndex(uint256 total, uint256 offset, uint256 i, bool reverse)
-        private
+    function pageIndex(uint256 total, uint256 offset, uint256 i, bool reverse)
+        internal
         pure
         returns (uint256)
     {
