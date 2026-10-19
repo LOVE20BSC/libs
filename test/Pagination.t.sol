@@ -78,6 +78,19 @@ contract PaginationTest {
     // ==================== Pinned windows ====================
     // Exact expectations, written out so the window semantics are readable without running the code.
 
+    function testPageHelpersExposeTheWindowMath() external pure {
+        require(Pagination.pageCount(5, 0, 10) == 5);
+        require(Pagination.pageCount(5, 1, 2) == 2);
+        require(Pagination.pageCount(5, 4, 10) == 1);
+        require(Pagination.pageCount(5, 5, 10) == 0);
+        require(Pagination.pageCount(5, 0, 0) == 0);
+
+        require(Pagination.pageIndex(5, 1, 0, false) == 1);
+        require(Pagination.pageIndex(5, 1, 2, false) == 3);
+        require(Pagination.pageIndex(5, 0, 0, true) == 4);
+        require(Pagination.pageIndex(5, 2, 1, true) == 1);
+    }
+
     function testEmptyCollectionReturnsEmptyPageAndZeroTotal() external {
         PaginationHarness harness = new PaginationHarness();
         (uint256[] memory values, uint256 total) = harness.valuePage(0, 5, false);

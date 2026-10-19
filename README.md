@@ -26,8 +26,10 @@ Shared pagination window used by every collection getter. A page is described by
 - `paginateIndices(uint256 total, uint256 offset, uint256 limit, bool reverse)` - Source indices only; the caller reads whatever it needs from them. Use this when the element type is not `uint256`/`address` (structs, parallel arrays, extracted fields).
 - `paginate(uint256[] storage items, uint256 offset, uint256 limit, bool reverse)` - Page of a `uint256[]` storage array.
 - `paginate(address[] storage items, uint256 offset, uint256 limit, bool reverse)` - Page of an `address[]` storage array.
+- `pageCount(uint256 total, uint256 offset, uint256 limit)` - Window size only; the shared math behind every page helper, for callers that only need the count.
+- `pageIndex(uint256 total, uint256 offset, uint256 i, bool reverse)` - Position of the `i`-th entry in the requested window; the shared index math.
 
-The two `paginate` overloads return `(page, total)`; the window math lives once in the private helpers, so the different element types only differ in what they copy out.
+The two `paginate` overloads return `(page, total)`; the window math lives once in `pageCount`/`pageIndex`, so the different element types only differ in what they copy out.
 
 ## Uint256Set
 
