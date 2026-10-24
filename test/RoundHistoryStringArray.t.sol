@@ -85,14 +85,14 @@ contract RoundHistoryStringArrayTest {
         _assertValues(harness.values(1), _pair("new", "extra"));
     }
 
-    function testRevertInvalidKeyOrder() external {
+    function testRevertKeyOrderPanic() external {
         RoundHistoryStringArrayHarness harness = new RoundHistoryStringArrayHarness();
         harness.record(5, _one("data"));
         try harness.record(3, _one("error")) {
-            revert("expected InvalidKeyOrder");
+            revert("expected key order panic");
         } catch (bytes memory reason) {
             // forge-lint: disable-next-line(unsafe-typecast)
-            require(bytes4(reason) == OrderedHistoryIndex.InvalidKeyOrder.selector);
+            require(bytes4(reason) == bytes4(0x4e487b71));
         }
     }
 

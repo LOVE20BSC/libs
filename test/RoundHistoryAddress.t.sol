@@ -68,10 +68,10 @@ contract RoundHistoryAddressTest {
         RoundHistoryAddressHarness harness = new RoundHistoryAddressHarness();
         harness.record(5, ADDR1);
         try harness.record(3, ADDR2) {
-            revert("expected InvalidKeyOrder");
+            revert("expected key order panic");
         } catch (bytes memory reason) {
             // forge-lint: disable-next-line(unsafe-typecast)
-            require(bytes4(reason) == OrderedHistoryIndex.InvalidKeyOrder.selector);
+            require(bytes4(reason) == bytes4(0x4e487b71));
         }
     }
 

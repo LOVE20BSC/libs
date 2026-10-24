@@ -2,8 +2,6 @@
 pragma solidity =0.8.37;
 
 library OrderedHistoryIndex {
-    error InvalidKeyOrder();
-
     struct Index {
         uint256[] keys;
         mapping(uint256 => bool) recorded;
@@ -14,8 +12,8 @@ library OrderedHistoryIndex {
         if (length == 0 || key > self.keys[length - 1]) {
             self.keys.push(key);
             self.recorded[key] = true;
-        } else if (key < self.keys[length - 1]) {
-            revert InvalidKeyOrder();
+        } else {
+            assert(key == self.keys[length - 1]);
         }
     }
 

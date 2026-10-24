@@ -556,10 +556,10 @@ contract RoundHistoryUint256SetTest {
         RoundHistoryUint256SetHarness harness = new RoundHistoryUint256SetHarness();
         harness.add(5, 11);
         try harness.add(3, 12) {
-            revert("expected InvalidKeyOrder");
+            revert("expected key order panic");
         } catch (bytes memory reason) {
             // forge-lint: disable-next-line(unsafe-typecast)
-            require(bytes4(reason) == OrderedHistoryIndex.InvalidKeyOrder.selector);
+            require(bytes4(reason) == bytes4(0x4e487b71));
         }
     }
 

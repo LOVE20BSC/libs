@@ -51,11 +51,11 @@ contract OrderedHistoryIndexTest {
         require(harness.length() == 2);
 
         try harness.recordKey(15) {
-            revert("expected InvalidKeyOrder");
+            revert("expected key order panic");
         } catch (bytes memory reason) {
             // The revert payload is checked to contain at least four bytes by the test harness.
             // forge-lint: disable-next-line(unsafe-typecast)
-            require(bytes4(reason) == OrderedHistoryIndex.InvalidKeyOrder.selector);
+            require(bytes4(reason) == bytes4(0x4e487b71));
         }
         require(harness.length() == 2);
     }
