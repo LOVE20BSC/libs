@@ -11,7 +11,7 @@ Because the index only appends, a key written *ahead* of the current round moves
 That flag stops at the index. The typed histories discard it and return the type's default (`0`, `address(0)`, `""`, empty array) both for "no record at or before this round" and for a recorded default value, so **the two cases are not distinguishable through `RoundHistory*.value` / `values`**. Reading `value(round) == 0` as "no record" is therefore wrong: it also fires for a legitimately recorded zero and for every later round that inherits one. A caller that needs the distinction must ask the index itself (`OrderedHistoryIndex.contains` / `nearest` on the same `History`) instead of inferring it from the returned value.
 
 **API:**
-- `record(uint256 key)` - Record a new key (must be >= last key; older keys revert with `InvalidKeyOrder`)
+- `record(uint256 key)` - Record a new key (must be >= last key; older keys revert with `InvalidKeyOrder(uint256 key, uint256 lastKey)` — the offending key first, the tip of the history second; for the aggregate types that tip is the tip of the specific history being written, not necessarily the newest round of the whole structure)
 - `contains(uint256 key)` - Check if a key was recorded
 - `nearest(uint256 key)` - Largest recorded key <= target, plus a `found` flag
 - `latest()` - Most recent key, plus a `found` flag
@@ -31,9 +31,9 @@ Shared pagination window used by every collection getter. A page is described by
 - `paginate(uint256[] storage items, uint256 offset, uint256 limit, bool reverse)` - Page of a `uint256[]` storage array.
 - `paginate(address[] storage items, uint256 offset, uint256 limit, bool reverse)` - Page of an `address[]` storage array.
 - `pageCount(uint256 total, uint256 offset, uint256 limit)` - Window size only; the shared math behind every page helper, for callers that only need the count.
-- `pageIndex(uint256 total, uint256 offset, uint256 i, bool reverse)` - Position of the `i`-th entry in the requested window; the shared index math. Precondition: `i < pageCount(total, offset, limit)`. The page helpers always satisfy it, but a direct caller that passes `i` past the window underflows in the reverse direction (`Panic(0x11)`) instead of clamping.
+- `pageIndex(uint256 total, uint256 offset, uint256 i, bool reverse)` - Position of the `i`-th entry in the requested window; the shared index math. Precondition: `i < pageCount(total, offset, limit)`. The page helpers always satisfy it; a direct caller that breaks it is not validated: forward returns `offset + i` unchecked (may point past the collection), and reverse returns `total - 1 - offset - i`, which is a wrong-but-in-range position until `i > total - 1 - offset`, where it underflows (`Panic(0x11)`). There is no clamping, so an out-of-window `i` silently reads the wrong entry before it reverts.
 
-The two `paginate` overloads return `(page, total)`; the window math lives once in `pageCount`/`pageIndex`, so the different element types only differ in what they copy out.
+The two `paginate` overloads return `(page, total)`; the window math lives once in `pageCount`/`pageIndex`, and each overload repeats only the allocate-and-copy loop around it.
 
 ## Uint256Set
 
@@ -46,7 +46,7 @@ Membership and position share one mapping `indexPlusOne`, encoding `index + 1` s
 - `remove(uint256 value)` - Swap-and-pop removal; returns whether the element was actually removed (`false` when absent, no state change, no revert)
 - `contains(uint256 value)` - O(1) membership check
 - `count()` - Number of elements
-- `clear()` - Remove every element; the only correct way to empty the set (see below). O(n) in `items`
+- `clear()` - Remove every element; the only correct way to empty the set (see below). O(n) in `items`, so it is only for sets known to be small: on a large set the walk can exceed the caller's gas budget
 - `values(uint256 offset, uint256 limit, bool reverse)` - Paginated page and real total
 
 `clear()` exists because the storage struct cannot be reset with `delete`: in Solidity `delete` empties the dynamic array but leaves the `indexPlusOne` mapping untouched, which desynchronises the two representations — `count()` reads zero while `contains()` still answers `true`, and a later `remove` of a stale element underflows. `clear()` walks `items` and deletes each entry before emptying the array.
@@ -128,10 +128,11 @@ Tracks a **set** of `uint256` values across rounds, replacing the legacy `RoundH
 
 Writes require a non-decreasing `round` (same constraint as `RoundHistoryUint256`); re-recording the same round keeps only that round's final value. Removal is swap-and-pop, so the order guarantee matches `Uint256Set`: an `offset` is not stable across calls, and enumeration is paginated only (`contains`/`count` are O(1) reads of the latest recorded value; `containsByRound`/`countByRound` are point queries that are O(1) on an exact round hit and fall back to a binary search — O(log rounds) — otherwise; none of them is a second enumeration path).
 
-The two `bool` returns carry the same idempotence signal as the plain sets, so a caller can write `listed ? set.add(round, id) : set.remove(round, id)` and react only when the round's set actually changed. There is no `clear`: the other two sets offer one because a single `delete` would leave their
-side mapping behind, but draining this one costs `n` full removals, so the caller should key a
-fresh `Storage` off the round instead of wiping the struct. `delete` on any of the three set
-structs is never correct — it empties the arrays and leaves the mappings populated.
+A read for a round **after** the last write resolves to the nearest recorded round at or before it, so an unwritten future round reads exactly like today's state. A caller that needs "not yet written" semantics must clamp the round itself (as `action/src/ActionTarget.sol` does).
+
+Cost: every effective `add`/`remove` at a fresh round writes three histories — about nine cold storage slots — measured at ~290k gas for a first add and ~362k for a middle remove at a new round, versus ~71k / ~38k for the same one-call probe on `Uint256Set`. Nothing is ever deleted: per-element and per-round words are permanent. Budget both the writes and the page sizes from this, not from the plain set's cost. Separately, `remove` also zeroes the slot it vacated at the old size; the public reads never observe that write (they only read slots below `count`, and a re-used slot is overwritten first), but it keeps the white-box invariant "every slot at or above `count` is vacant" true.
+
+The two `bool` returns carry the same idempotence signal as the plain sets, so a caller can write `listed ? set.add(round, id) : set.remove(round, id)` and react only when the round's set actually changed. There is no `clear`: the other two sets offer one because a single `delete` would leave their side mapping behind, but draining this one costs `n` full removals, so the caller should key a fresh `Storage` off the round instead of wiping the struct. `delete` on any of the three set structs is never correct — it empties the arrays and leaves the mappings populated.
 
 **API:**
 - `add(uint256 round, uint256 value)` - Insert; returns whether the round's set changed (`false` when already present, no state change)
@@ -152,6 +153,8 @@ All `RoundHistory*` libraries share the same core pattern:
 
 This design single-sources the risky part but not the glue. The index management exists once in `OrderedHistoryIndex`; the record/query skeleton on top of it — record, exact-hit fast path, `nearest()` fallback, `latestValue` — is repeated in each of the five scalar and array files, and 70–80% of their lines survive normalizing the element type (what differs is the type name and the default value returned on a miss). That duplication is deliberate: Solidity has no generics and each type wants its own storage layout, so the five files have to be changed together by hand. Only the `AddressSet`/`Uint256Set` mirror is gated by a test; the five histories are not.
 
+`OrderedHistoryIndex` keeps both the ordered `keys` array and a redundant `recorded` mapping. The mapping makes the typed histories' exact-round fast path an O(1) membership read; the cost is one extra cold SSTORE (~24.6k gas measured over ten fresh keys) per new key, roughly doubling the record write cost. That tradeoff is deliberate — exact historical reads dominate — but it is not free, so a future change should not remove the mapping without measuring the read path.
+
 `RoundHistoryUint256Set` extends the same pattern to a set: the index histories are keyed by slot (`slotHistory`) and by element (`indexPlusOneHistory`), with `countHistory` holding the size. Every read of the *current* state is O(1) or O(page) — `latestValue()` reads the last recorded key, and `values()` reads one `latestValue()` per slot — so the current state needs no extra copy. A read of a *past* round is not O(page): the set has no `value(round)`, and all three of its round accessors (`containsByRound`, `countByRound`, `valuesByRound`) fall back to `nearest()`; `valuesByRound` does so **per element**, making it O(page × log rounds) — roughly one binary search over the slot's history for each entry in the page. Size a page from that cost, not from the `values()` cost.
 
 `AddressSet` applies the same shape to plain (non-historical) `address` membership: it is the element-type sibling of `Uint256Set` — same sentinel encoding and swap-and-pop removal, kept identical by construction, with only the element type differing. The two files are deliberate mirrors rather than one shared generic, so keeping them behaviorally identical is a maintenance obligation: any change to the sentinel, removal, or pagination semantics of one must be mirrored in the other in the same change. That obligation is gated: `test/MirrorParity.t.sol` runs one scripted and one fuzzed operation sequence through both libraries at once and compares every observable after each single operation, so a one-sided change fails there instead of shipping.
@@ -160,8 +163,14 @@ Collections here expose every enumeration through `Pagination` and never through
 
 ## Build and lint gate
 
-`forge lint` is a build gate here, as in core and action: the post-build lint step fails on any finding, so a clean `forge build` implies a clean lint. Production sources are linted in full.
+`forge lint` is a build gate here, as in core and action: the post-build lint step fails on any finding at the configured severities (`high`, `med`, `low`), so a clean `forge build` implies a clean lint at those severities. `info`/`gas` findings are not gated — pristine `src` carries two `note[internal-function-used-once]` findings on the two `paginate` overloads, deliberately left open. Production sources are linted in full apart from four inline `boolean-cst` suppressions in `OrderedHistoryIndex.sol`, which the sources' comparison/ternary style triggers.
 
-`[lint] ignore` covers `test/**/*.sol` only. The harnesses expose the set API verbatim, so every test that calls `add` / `remove` for its state effect alone drops the `bool` return and raises `unused-return` — that is most of the one-call unit tests as well as the state-machine and differential loops, 136 findings in total. Without the ignore the build fails.
+`[lint] ignore` covers `test/**/*.sol` only. The harnesses expose the set API verbatim, so every test that calls `add` / `remove` for its state effect alone drops the `bool` return and raises `unused-return` — most one-call unit tests as well as the state-machine and differential loops. At `2dca18b` that is 232 `unused-return` findings, plus the 24 findings the parity test's external-call loops and casts introduce (`calls-loop` 10, `require-revert-in-loop` 13, `unsafe-typecast` 1): 256 in total at the configured severities. The count grows with the suite, so treat these numbers as a measurement, not a constant; without the ignore the build fails.
 
 One difference from the sibling repos: core, action and group-chat also `exclude_lints` `unused-return`, which switches that rule off for their production sources too. Here it stays on for `src`, and only test files are skipped.
+
+There is deliberately **no formatting gate**. The workspace dev-standards (§5.1) do not use `forge fmt` as the reference style — multi-line parameter lists, `,)` spacing and similar differ — the repo carries no `[fmt]` config and `forge fmt --check` is not a gate, so a non-zero `forge fmt --check` here is expected and is not a regression. Run `forge fmt` only when the intent is to restyle the whole tree.
+
+The exact `=0.8.37` pragma (sources and `foundry.toml`) is policy too: the workspace pins Solidity 0.8.37 for every contract and test, and `core`, `action` and `group-chat` all use the same version, so the library is consumed at exactly one compiler version rather than a range.
+
+CI (`.github/workflows/ci.yml`) runs the same gates as the sibling repos: `forge build --force --deny warnings`, `forge lint`, `forge test`.
