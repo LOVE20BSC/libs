@@ -637,12 +637,22 @@ contract AddressSetTest {
         require(total == count, "total is the collection size");
         require(page.length == expectedSize, "window size matches the counted range");
 
-        bool slotsHold = true;
-        for (uint256 i = 0; i < page.length; i++) {
-            uint256 slot = reverse ? (count - 1 - offset - i) : (offset + i);
-            if (page[i] != _val(slot * 3 + 1)) slotsHold = false;
+        // See the `Uint256Set` twin: the forward entries come from the known insertion layout and
+        // the reverse direction is checked against the mirrored forward window, not by restating
+        // `pageIndex`.
+        (address[] memory ascending, ) = harness.values(0, type(uint256).max, false);
+        require(ascending.length == count, "forward read covers the collection");
+        if (reverse) {
+            for (uint256 i = 0; i < page.length; i++) {
+                require(
+                    page[i] == ascending[count - 1 - (offset + i)], "reverse page mirrors the forward window"
+                );
+            }
+        } else {
+            for (uint256 i = 0; i < page.length; i++) {
+                require(page[i] == _val((offset + i) * 3 + 1), "forward page is the element at that slot");
+            }
         }
-        require(slotsHold, "page entry is the element at that slot");
     }
 
     /// Extreme windows must stay non-reverting and still report the real total.

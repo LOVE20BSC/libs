@@ -628,12 +628,21 @@ contract Uint256SetTest {
         require(total == count, "total is the collection size");
         require(page.length == expectedSize, "window size matches the counted range");
 
-        bool slotsHold = true;
-        for (uint256 i = 0; i < page.length; i++) {
-            uint256 slot = reverse ? (count - 1 - offset - i) : (offset + i);
-            if (page[i] != slot * 3 + 1) slotsHold = false;
+        // The forward entries are checked against the known insertion layout. The reverse direction
+        // is checked relationally instead: a reversed page must be the forward window applied to the
+        // reversed collection. Composing the two public reads keeps this oracle off `pageIndex`'s
+        // reverse arithmetic, so a mis-specified window cannot agree with it.
+        (uint256[] memory ascending, ) = harness.values(0, type(uint256).max, false);
+        require(ascending.length == count, "forward read covers the collection");
+        if (reverse) {
+            for (uint256 i = 0; i < page.length; i++) {
+                require(page[i] == ascending[count - 1 - (offset + i)], "reverse page mirrors the forward window");
+            }
+        } else {
+            for (uint256 i = 0; i < page.length; i++) {
+                require(page[i] == (offset + i) * 3 + 1, "forward page is the element at that slot");
+            }
         }
-        require(slotsHold, "page entry is the element at that slot");
     }
 
     /// Extreme windows must stay non-reverting and still report the real total.
