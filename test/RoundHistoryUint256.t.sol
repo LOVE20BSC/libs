@@ -86,6 +86,30 @@ contract RoundHistoryUint256Test {
         require(harness.value(2) == 70);
     }
 
+    /// `decrease` is checked arithmetic, so subtracting past the value in force must revert rather
+    /// than wrap. The branch had no coverage: only the happy path was exercised.
+    function testDecreaseBelowCurrentValueReverts() external {
+        RoundHistoryUint256Harness harness = new RoundHistoryUint256Harness();
+        harness.record(1, 100);
+
+        (bool ok, bytes memory reason) =
+            address(harness).call(abi.encodeWithSelector(harness.decrease.selector, uint256(1), uint256(101)));
+        require(!ok, "decrease past zero must revert");
+        _requireArithmeticPanic(reason);
+    }
+
+    /// `increase` can overflow on a long-lived history; that must surface as an arithmetic panic
+    /// rather than silently wrapping the accumulator.
+    function testIncreasePastMaximumReverts() external {
+        RoundHistoryUint256Harness harness = new RoundHistoryUint256Harness();
+        harness.record(1, type(uint256).max);
+
+        (bool ok, bytes memory reason) =
+            address(harness).call(abi.encodeWithSelector(harness.increase.selector, uint256(1), uint256(1)));
+        require(!ok, "increase past the maximum must revert");
+        _requireArithmeticPanic(reason);
+    }
+
     function testRevertInvalidRound() external {
         RoundHistoryUint256Harness harness = new RoundHistoryUint256Harness();
         harness.record(5, 500);
@@ -108,5 +132,22 @@ contract RoundHistoryUint256Test {
         RoundHistoryUint256Harness harness = new RoundHistoryUint256Harness();
         require(harness.latestValue() == 0);
         require(harness.value(1) == 0);
+    }
+
+    /// Decodes the `Panic(uint256)` payload and asserts the code, not only the selector: a
+    /// selector-only check would also accept `Panic(0x01)` from an `assert`.
+    function _requireArithmeticPanic(bytes memory reason) private pure {
+        require(reason.length == 4 + 32, "expected Panic(uint256)");
+        // forge-lint: disable-next-line(unsafe-typecast)
+        require(bytes4(reason) == bytes4(0x4e487b71), "not a Panic");
+        require(abi.decode(_payload(reason), (uint256)) == 0x11, "not an arithmetic panic");
+    }
+
+    /// Strips the four-byte selector so the arguments can be `abi.decode`d.
+    function _payload(bytes memory reason) private pure returns (bytes memory args) {
+        args = new bytes(reason.length - 4);
+        for (uint256 i = 0; i < args.length; i++) {
+            args[i] = reason[i + 4];
+        }
     }
 }
