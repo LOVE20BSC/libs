@@ -106,7 +106,7 @@ Tracks `address` values across rounds. It is the scalar `address` partner of `Ro
 
 ### RoundHistoryUint256Array
 
-Tracks `uint256[]` values across rounds, for per-round configuration arrays such as secondary-distribution recipients and ratios. Recording an empty array is a regular record — it is how a round explicitly clears the value; rounds without a record inherit the latest earlier record, and `values()` returns an empty array when no earlier record exists.
+Tracks `uint256[]` values across rounds, for per-round configuration arrays such as secondary-distribution recipients and ratios. Recording an empty array is a regular record — it is how a round explicitly clears the value; rounds without a record inherit the latest earlier record, and `values()` returns an empty array when no earlier record exists. A deliberate clear and a round that never had a record are indistinguishable through `values()`, since both yield an empty array: the clear is a statement about the history, not an observable state.
 
 **API:**
 - `record(uint256 round, uint256[] values)` - Record the round's values; re-recording the latest round overwrites it
