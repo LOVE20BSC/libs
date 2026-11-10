@@ -636,7 +636,13 @@ contract Uint256SetTest {
         require(ascending.length == count, "forward read covers the collection");
         if (reverse) {
             for (uint256 i = 0; i < page.length; i++) {
-                require(page[i] == ascending[count - 1 - (offset + i)], "reverse page mirrors the forward window");
+                uint256 slot = count - 1 - (offset + i);
+                // Two arms. The first does not involve the library at all: the entry must be the
+                // element the known insertion layout puts at that slot. The second keeps the two
+                // public reads consistent with each other — the reversed page is the forward window
+                // applied to the reversed collection.
+                require(page[i] == slot * 3 + 1, "reverse page is the element at that slot");
+                require(page[i] == ascending[slot], "reverse page mirrors the forward window");
             }
         } else {
             for (uint256 i = 0; i < page.length; i++) {

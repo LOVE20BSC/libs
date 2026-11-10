@@ -644,9 +644,11 @@ contract AddressSetTest {
         require(ascending.length == count, "forward read covers the collection");
         if (reverse) {
             for (uint256 i = 0; i < page.length; i++) {
-                require(
-                    page[i] == ascending[count - 1 - (offset + i)], "reverse page mirrors the forward window"
-                );
+                uint256 slot = count - 1 - (offset + i);
+                // See the `Uint256Set` twin: an absolute arm against the known insertion layout plus
+                // a relational arm tying the two public reads together.
+                require(page[i] == _val(slot * 3 + 1), "reverse page is the element at that slot");
+                require(page[i] == ascending[slot], "reverse page mirrors the forward window");
             }
         } else {
             for (uint256 i = 0; i < page.length; i++) {
