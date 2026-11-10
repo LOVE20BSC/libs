@@ -188,10 +188,13 @@ contract MirrorParityTest {
     }
 
     /// Compares a single window, in one direction, across both libraries.
-    function _assertWindowInStep(Uint256SetProbe u, AddressSetProbe a, uint256 offset, uint256 limit, bool reverse)
-        private
-        view
-    {
+    function _assertWindowInStep(
+        Uint256SetProbe u,
+        AddressSetProbe a,
+        uint256 offset,
+        uint256 limit,
+        bool reverse
+    ) private view {
         (uint256[] memory page, uint256 total) = u.values(offset, limit, reverse);
         (address[] memory mirrorPage, uint256 mirrorTotal) = a.values(offset, limit, reverse);
         require(total == mirrorTotal, "window total diverged");
