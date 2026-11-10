@@ -31,12 +31,12 @@ contract RoundHistoryUint256SetHarness {
 
     RoundHistoryUint256Set.Storage private _set;
 
-    function add(uint256 round, uint256 value) external {
-        _set.add(round, value);
+    function add(uint256 round, uint256 value) external returns (bool) {
+        return _set.add(round, value);
     }
 
-    function remove(uint256 round, uint256 value) external {
-        _set.remove(round, value);
+    function remove(uint256 round, uint256 value) external returns (bool) {
+        return _set.remove(round, value);
     }
 
     function contains(uint256 value) external view returns (bool) {
@@ -120,6 +120,18 @@ contract RoundHistoryUint256SetTest {
     }
 
     // ==================== Pinned behaviour ====================
+
+    function testAddRemoveReportWhetherTheRoundChanged() external {
+        RoundHistoryUint256SetHarness harness = new RoundHistoryUint256SetHarness();
+
+        require(!harness.remove(1, 7)); // absent: no change
+        require(harness.add(1, 7)); // first insert: changed
+        require(!harness.add(1, 7)); // duplicate: no change
+        require(harness.remove(2, 7)); // present: changed
+        require(!harness.remove(2, 7)); // already gone: no change
+        require(harness.count() == 0);
+        require(!harness.contains(7));
+    }
 
     function testAddAndCurrentState() external {
         RoundHistoryUint256SetHarness harness = new RoundHistoryUint256SetHarness();

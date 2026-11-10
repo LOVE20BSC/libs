@@ -128,14 +128,14 @@ Tracks a **set** of `uint256` values across rounds, replacing the legacy `RoundH
 
 Writes require a non-decreasing `round` (same constraint as `RoundHistoryUint256`); re-recording the same round keeps only that round's final value. Removal is swap-and-pop, so the order guarantee matches `Uint256Set`: an `offset` is not stable across calls, and enumeration is paginated only (`contains`/`count` are O(1) reads of the latest recorded value; `containsByRound`/`countByRound` are point queries that are O(1) on an exact round hit and fall back to a binary search — O(log rounds) — otherwise; none of them is a second enumeration path).
 
-There is no `clear`: the other two sets offer one because a single `delete` would leave their
+The two `bool` returns carry the same idempotence signal as the plain sets, so a caller can write `listed ? set.add(round, id) : set.remove(round, id)` and react only when the round's set actually changed. There is no `clear`: the other two sets offer one because a single `delete` would leave their
 side mapping behind, but draining this one costs `n` full removals, so the caller should key a
 fresh `Storage` off the round instead of wiping the struct. `delete` on any of the three set
 structs is never correct — it empties the arrays and leaves the mappings populated.
 
 **API:**
-- `add(uint256 round, uint256 value)` - Insert; no-op if already present
-- `remove(uint256 round, uint256 value)` - Swap-and-pop removal; no-op if absent
+- `add(uint256 round, uint256 value)` - Insert; returns whether the round's set changed (`false` when already present, no state change)
+- `remove(uint256 round, uint256 value)` - Swap-and-pop removal; returns whether the round's set changed (`false` when absent, no state change, no revert)
 - `contains(uint256 value)` - Current membership
 - `count()` - Current size
 - `values(uint256 offset, uint256 limit, bool reverse)` - Paginated current page and real total

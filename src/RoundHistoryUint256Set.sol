@@ -19,22 +19,23 @@ library RoundHistoryUint256Set {
         mapping(uint256 => RoundHistoryUint256.History) indexPlusOneHistory;
     }
 
-    function add(Storage storage self, uint256 round, uint256 value) internal {
-        if (self.indexPlusOneHistory[value].latestValue() != 0) return;
+    function add(Storage storage self, uint256 round, uint256 value) internal returns (bool added) {
+        if (self.indexPlusOneHistory[value].latestValue() != 0) return false;
 
         uint256 index = self.countHistory.latestValue();
         self.slotHistory[index].record(round, value);
         self.indexPlusOneHistory[value].record(round, index + 1);
         self.countHistory.record(round, index + 1);
+        return true;
     }
 
     // Load-bearing: an element whose `indexPlusOneHistory` is non-zero must sit below
     // `countHistory`. `slotHistory` is a mapping, so a broken pairing is not caught by a bounds
     // check: `remove` would write past the last slot and shrink the count, silently dropping a
     // different element from the set instead of reverting.
-    function remove(Storage storage self, uint256 round, uint256 value) internal {
+    function remove(Storage storage self, uint256 round, uint256 value) internal returns (bool removed) {
         uint256 indexPlusOne = self.indexPlusOneHistory[value].latestValue();
-        if (indexPlusOne == 0) return;
+        if (indexPlusOne == 0) return false;
 
         uint256 removedIndex = indexPlusOne - 1;
         uint256 lastIndex = self.countHistory.latestValue() - 1;
@@ -46,6 +47,7 @@ library RoundHistoryUint256Set {
         self.slotHistory[lastIndex].record(round, 0);
         self.countHistory.record(round, lastIndex);
         self.indexPlusOneHistory[value].record(round, 0);
+        return true;
     }
 
     function contains(Storage storage self, uint256 value) internal view returns (bool) {
