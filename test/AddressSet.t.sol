@@ -5,7 +5,7 @@ import {AddressSet} from "../src/AddressSet.sol";
 
 /// Bundle returned by `AddressSetHarness.probe`, shared with the test contract. Returning it from an
 /// external call keeps the fuzz loops to a single external call per step and keeps their stack small.
-struct SetProbe {
+struct AddressSetProbe {
     address[] items;
     uint256 total;
     address[] reversed;
@@ -57,7 +57,7 @@ contract AddressSetHarness {
 
     /// One-call dump of every observable the state-machine checks need: both page directions, plus the
     /// sentinel value for a caller-chosen domain and for each stored element.
-    function probe(address[] calldata domain) external view returns (SetProbe memory p) {
+    function probe(address[] calldata domain) external view returns (AddressSetProbe memory p) {
         (p.items, p.total) = _set.values(0, type(uint256).max, false);
         (p.reversed, p.reversedTotal) = _set.values(0, type(uint256).max, true);
         p.domainIndexPlusOne = new uint256[](domain.length);
@@ -132,6 +132,31 @@ contract AddressSetTest {
 
         require(harness.add(_val(2)));
         require(harness.indexPlusOneOf(_val(2)) == 1);
+        require(harness.count() == 1);
+    }
+
+    /// `clear()` is O(n); exercise a set much larger than the other pinned cases so the walk is not
+    /// only covered for one- or two-element arrays.
+    function testClearLargeSet() external {
+        AddressSetHarness harness = new AddressSetHarness();
+        for (uint256 i = 0; i < 48; i++) {
+            // forge-lint: disable-next-line(calls-loop)
+            harness.add(_val(i));
+        }
+        require(harness.count() == 48);
+
+        harness.clear();
+
+        require(harness.count() == 0);
+        for (uint256 i = 0; i < 48; i++) {
+            require(!harness.contains(_val(i)), "element survived clear");
+            require(harness.indexPlusOneOf(_val(i)) == 0, "sentinel survived clear");
+        }
+        (address[] memory page, uint256 total) = harness.values(0, type(uint256).max, false);
+        require(total == 0 && page.length == 0);
+
+        require(harness.add(_val(7)));
+        require(harness.indexPlusOneOf(_val(7)) == 1);
         require(harness.count() == 1);
     }
 
@@ -484,7 +509,7 @@ contract AddressSetTest {
     /// Pure, allocation-free representation check so it can be called from inside a fuzz loop:
     /// the page covers every element, `indexPlusOne[items[i]] == i + 1`, membership agrees with the
     /// model, and nothing outside the inserted domain is set.
-    function _representationOk(SetProbe memory p, address[] memory model, uint256 modelLen)
+    function _representationOk(AddressSetProbe memory p, address[] memory model, uint256 modelLen)
         private
         pure
         returns (bool ok)
@@ -501,7 +526,7 @@ contract AddressSetTest {
     }
 
     /// Pure, allocation-free set-equality check against the model, covering both page directions.
-    function _contentOk(SetProbe memory p, address[] memory model, uint256 modelLen)
+    function _contentOk(AddressSetProbe memory p, address[] memory model, uint256 modelLen)
         private
         pure
         returns (bool ok)
@@ -510,6 +535,16 @@ contract AddressSetTest {
             && p.reversed.length == modelLen && p.itemIndexPlusOne.length == p.items.length;
         for (uint256 i = 0; i < p.items.length; i++) {
             if (!_modelContains(model, modelLen, p.items[i])) ok = false;
+            // Distinctness plus the sentinel round-trip: a page that repeats one element and drops
+            // another has the right length and every entry is in the model, so membership alone
+            // would accept it. The reverse page must be the forward page read backwards.
+            if (p.itemIndexPlusOne[i] != i + 1) ok = false;
+            if (p.reversed.length == p.items.length && p.reversed[i] != p.items[p.items.length - 1 - i]) {
+                ok = false;
+            }
+            for (uint256 j = i + 1; j < p.items.length; j++) {
+                if (p.items[i] == p.items[j]) ok = false;
+            }
         }
         for (uint256 i = 0; i < p.reversed.length; i++) {
             if (!_modelContains(model, modelLen, p.reversed[i])) ok = false;
@@ -548,7 +583,7 @@ contract AddressSetTest {
                 modelLen = _modelRemove(model, modelLen, value);
             }
 
-            SetProbe memory p = harness.probe(domain); // forge-lint: disable-line(calls-loop)
+            AddressSetProbe memory p = harness.probe(domain); // forge-lint: disable-line(calls-loop)
             if (!_representationOk(p, model, modelLen)) {
                 ok = false;
             }
@@ -583,7 +618,7 @@ contract AddressSetTest {
                 modelLen = _modelRemove(model, modelLen, value);
             }
 
-            SetProbe memory p = harness.probe(domain); // forge-lint: disable-line(calls-loop)
+            AddressSetProbe memory p = harness.probe(domain); // forge-lint: disable-line(calls-loop)
             if (!_contentOk(p, model, modelLen)) {
                 ok = false;
             }
@@ -653,6 +688,35 @@ contract AddressSetTest {
         } else {
             for (uint256 i = 0; i < page.length; i++) {
                 require(page[i] == _val((offset + i) * 3 + 1), "forward page is the element at that slot");
+            }
+        }
+    }
+
+    /// Raw window words, no modulo: `offset`/`limit` may be `type(uint256).max`-scale, which the
+    /// bounded domains above can never reach. The expected size is counted, not restated.
+    function testFuzz_RawWindowWords(uint256 offset, uint256 limit, bool reverse) external {
+        AddressSetHarness harness = new AddressSetHarness();
+        uint256 count = 7;
+        for (uint256 i = 0; i < count; i++) {
+            // forge-lint: disable-next-line(calls-loop)
+            harness.add(_val(i * 3 + 1));
+        }
+        uint256 expectedSize = 0;
+        for (uint256 i = 0; i < count; i++) {
+            if (i >= offset && i - offset < limit) expectedSize++;
+        }
+        (address[] memory page, uint256 total) = harness.values(offset, limit, reverse);
+        require(total == count, "total is the collection size");
+        require(page.length == expectedSize, "raw window size");
+        (address[] memory ascending, ) = harness.values(0, type(uint256).max, false);
+        require(ascending.length == count);
+        if (!reverse) {
+            for (uint256 i = 0; i < page.length; i++) {
+                require(page[i] == ascending[offset + i], "raw window entry");
+            }
+        } else {
+            for (uint256 i = 0; i < page.length; i++) {
+                require(page[i] == ascending[count - 1 - (offset + i)], "raw reverse entry");
             }
         }
     }
