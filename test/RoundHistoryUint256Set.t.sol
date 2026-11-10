@@ -723,6 +723,10 @@ contract RoundHistoryUint256SetTest {
             // Membership alone would accept a window that repeats one member while dropping
             // another: every entry is checked to be in the snapshot, but nothing yet forced the
             // window to be a permutation of it. Size equality plus distinctness does.
+            //
+            // Order is deliberately not modelled. Removal is swap-and-pop and the README states that
+            // an `offset` is not stable across calls, so the slot order carries no guarantee; a
+            // permutation that still yields a permutation of the round's set is in contract.
             for (uint256 j = i + 1; j < p.itemsAtRound.length; j++) {
                 if (p.itemsAtRound[i] == p.itemsAtRound[j]) ok = false;
             }
