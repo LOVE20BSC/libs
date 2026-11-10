@@ -6,7 +6,9 @@ import {Pagination} from "./Pagination.sol";
 library Uint256Set {
     using Pagination for uint256[];
 
-    struct Storage {
+    // `delete` cannot reset this struct: it empties `items` but leaves `indexPlusOne` behind, so
+// `contains` would stay true while `count` reads zero. Use `clear` instead.
+struct Storage {
         uint256[] items;
         // element => index + 1; 0 means absent
         mapping(uint256 => uint256) indexPlusOne;
@@ -34,6 +36,15 @@ library Uint256Set {
         self.items.pop();
         delete self.indexPlusOne[value];
         return true;
+    }
+
+    // Iterates `items` because `delete` alone cannot reach into the mapping. O(n).
+    function clear(Storage storage self) internal {
+        uint256 length = self.items.length;
+        for (uint256 i = 0; i < length; i++) {
+            delete self.indexPlusOne[self.items[i]];
+        }
+        delete self.items;
     }
 
     function contains(Storage storage self, uint256 value) internal view returns (bool) {

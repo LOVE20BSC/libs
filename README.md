@@ -46,7 +46,10 @@ Membership and position share one mapping `indexPlusOne`, encoding `index + 1` s
 - `remove(uint256 value)` - Swap-and-pop removal; returns whether the element was actually removed (`false` when absent, no state change, no revert)
 - `contains(uint256 value)` - O(1) membership check
 - `count()` - Number of elements
+- `clear()` - Remove every element; the only correct way to empty the set (see below)
 - `values(uint256 offset, uint256 limit, bool reverse)` - Paginated page and real total
+
+`clear()` exists because the storage struct cannot be reset with `delete`: in Solidity `delete` empties the dynamic array but leaves the `indexPlusOne` mapping untouched, which desynchronises the two representations — `count()` reads zero while `contains()` still answers `true`, and a later `remove` of a stale element underflows. `clear()` walks `items` and deletes each entry before emptying the array.
 
 The two `bool` returns are the set's idempotence signal: group-chat's member list and ban list write through `listed ? set.add(id) : set.remove(id)` and emit their event only when that returns `true`, rather than testing membership beforehand. `add` always leaves the element present, so the return answers "did this call change the set", not "did it succeed".
 
@@ -61,7 +64,10 @@ Membership and position share one mapping `indexPlusOne`, encoding `index + 1` s
 - `remove(address value)` - Swap-and-pop removal; returns whether the element was actually removed (`false` when absent, no state change, no revert)
 - `contains(address value)` - O(1) membership check
 - `count()` - Number of elements
+- `clear()` - Remove every element; the only correct way to empty the set (see below)
 - `values(uint256 offset, uint256 limit, bool reverse)` - Paginated page and real total
+
+`clear()` exists because the storage struct cannot be reset with `delete`: in Solidity `delete` empties the dynamic array but leaves the `indexPlusOne` mapping untouched, which desynchronises the two representations — `count()` reads zero while `contains()` still answers `true`, and a later `remove` of a stale element underflows. `clear()` walks `items` and deletes each entry before emptying the array.
 
 The two `bool` returns carry the same idempotence signal as `Uint256Set`: `add` always leaves the element present, so the return answers "did this call change the set", not "did it succeed".
 
@@ -121,6 +127,11 @@ Tracks `string[]` values across rounds, with the same inheritance semantics as `
 Tracks a **set** of `uint256` values across rounds, replacing the legacy `RoundHistoryAddressSet` with `uint256` elements. Three histories are kept: the set size, `slot -> element`, and `element -> slot + 1` (`0` meaning "not in the set"). The current state is derived from these histories' `latestValue()`, so there is no second copy that could drift out of sync.
 
 Writes require a non-decreasing `round` (same constraint as `RoundHistoryUint256`); re-recording the same round keeps only that round's final value. Removal is swap-and-pop, so the order guarantee matches `Uint256Set`: an `offset` is not stable across calls, and enumeration is paginated only (`contains`/`count` are O(1) reads of the latest recorded value; `containsByRound`/`countByRound` are point queries that are O(1) on an exact round hit and fall back to a binary search — O(log rounds) — otherwise; none of them is a second enumeration path).
+
+There is no `clear`: the other two sets offer one because a single `delete` would leave their
+side mapping behind, but draining this one costs `n` full removals, so the caller should key a
+fresh `Storage` off the round instead of wiping the struct. `delete` on any of the three set
+structs is never correct — it empties the arrays and leaves the mappings populated.
 
 **API:**
 - `add(uint256 round, uint256 value)` - Insert; no-op if already present

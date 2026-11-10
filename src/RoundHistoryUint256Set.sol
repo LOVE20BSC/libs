@@ -7,6 +7,10 @@ import {Pagination} from "./Pagination.sol";
 library RoundHistoryUint256Set {
     using RoundHistoryUint256 for RoundHistoryUint256.History;
 
+    // `delete` cannot reset this struct: it empties the histories' `keys` arrays but leaves their
+    // mappings behind, so `contains` would stay true while `count` reads zero. There is no `clear`
+    // here because draining a set of n elements costs n full removals; reset by keying a fresh
+    // `Storage` off the round instead.
     struct Storage {
         RoundHistoryUint256.History countHistory;
         // slot => element history

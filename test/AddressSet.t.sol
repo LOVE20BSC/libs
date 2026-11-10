@@ -28,6 +28,10 @@ contract AddressSetHarness {
         return _set.remove(value);
     }
 
+    function clear() external {
+        _set.clear();
+    }
+
     function contains(address value) external view returns (bool) {
         return _set.contains(value);
     }
@@ -110,6 +114,25 @@ contract AddressSetTest {
 
         require(harness.count() == 0);
         require(!harness.contains(_val(7)));
+    }
+
+    function testClearResetsBothRepresentations() external {
+        AddressSetHarness harness = new AddressSetHarness();
+        harness.add(_val(1));
+        harness.add(_val(2));
+
+        harness.clear();
+
+        require(harness.count() == 0);
+        require(!harness.contains(_val(1)) && !harness.contains(_val(2)));
+        require(harness.indexPlusOneOf(_val(1)) == 0 && harness.indexPlusOneOf(_val(2)) == 0);
+        (address[] memory page, uint256 total) = harness.values(0, 10, false);
+        require(total == 0);
+        require(page.length == 0);
+
+        require(harness.add(_val(2)));
+        require(harness.indexPlusOneOf(_val(2)) == 1);
+        require(harness.count() == 1);
     }
 
     function testRemoveAbsentIsNoop() external {

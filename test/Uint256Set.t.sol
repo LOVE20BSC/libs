@@ -28,6 +28,10 @@ contract Uint256SetHarness {
         return _set.remove(value);
     }
 
+    function clear() external {
+        _set.clear();
+    }
+
     function contains(uint256 value) external view returns (bool) {
         return _set.contains(value);
     }
@@ -110,6 +114,27 @@ contract Uint256SetTest {
 
         require(harness.count() == 0);
         require(!harness.contains(7));
+    }
+
+    function testClearResetsBothRepresentations() external {
+        Uint256SetHarness harness = new Uint256SetHarness();
+        harness.add(1);
+        harness.add(2);
+        harness.add(3);
+
+        harness.clear();
+
+        require(harness.count() == 0);
+        require(!harness.contains(1) && !harness.contains(3));
+        require(harness.indexPlusOneOf(1) == 0 && harness.indexPlusOneOf(3) == 0);
+        (uint256[] memory page, uint256 total) = harness.values(0, 10, false);
+        require(total == 0);
+        require(page.length == 0);
+
+        // The sentinel restarts at 1; a mapping left behind by `delete` would still hold 3 -> 3.
+        require(harness.add(3));
+        require(harness.indexPlusOneOf(3) == 1);
+        require(harness.count() == 1);
     }
 
     function testRemoveAbsentIsNoop() external {
