@@ -432,6 +432,8 @@ contract RoundHistoryUint256SetTest {
         require(harness.slotAt(0) == 10);
         require(harness.indexPlusOneOf(10) == 1);
         require(harness.indexPlusOneOf(20) == 0);
+        // the vacated slot above the new count is zeroed, not left holding 20
+        require(harness.slotAt(1) == 0);
 
         (uint256[] memory page, uint256 total) = harness.values(0, 10, false);
         _expect1(page, 10);
@@ -454,6 +456,8 @@ contract RoundHistoryUint256SetTest {
         require(harness.indexPlusOneOf(40) == 2);
         require(harness.indexPlusOneOf(30) == 3);
         require(harness.indexPlusOneOf(20) == 0);
+        // the vacated slot above the new count is zeroed, not left holding 40
+        require(harness.slotAt(3) == 0);
 
         (uint256[] memory page, uint256 total) = harness.valuesByRound(2, 0, 10, false);
         require(total == 3);
@@ -572,6 +576,23 @@ contract RoundHistoryUint256SetTest {
         } catch (bytes memory reason) {
             // The whole payload is pinned, so swapped operands fail too: the expected error is
             // InvalidKeyOrder(3, 5).
+            require(
+                keccak256(reason)
+                    == keccak256(
+                        abi.encodeWithSelector(OrderedHistoryIndex.InvalidKeyOrder.selector, uint256(3), uint256(5))
+                    )
+            );
+        }
+    }
+
+    /// The `remove` path panics from a different history than `add`; pin that revert too.
+    function testRemoveOnDecreasingRoundReverts() external {
+        RoundHistoryUint256SetHarness harness = new RoundHistoryUint256SetHarness();
+        harness.add(5, 11);
+
+        try harness.remove(3, 11) {
+            revert("expected InvalidKeyOrder");
+        } catch (bytes memory reason) {
             require(
                 keccak256(reason)
                     == keccak256(
@@ -777,6 +798,7 @@ contract RoundHistoryUint256SetTest {
             if (!_roundOk(p, domain, snaps, round)) ok = false;
 
             // a round strictly before the current one must read the previous snapshot
+            // (testFuzz_EveryPastRoundStaysImmutable sweeps every plateau after every op)
             if (round > 0) {
                 RhProbe memory earlier = harness.probe(round - 1, domain); // forge-lint: disable-line(calls-loop)
                 if (!_roundOk(earlier, domain, snaps, round - 1)) ok = false;
@@ -838,6 +860,58 @@ contract RoundHistoryUint256SetTest {
         }
 
         require(ok, "differential check against the snapshot model failed");
+    }
+
+    /// History immutability across *every* plateau: after each op, re-probe every snapshot round
+    /// already recorded (not just the current round and round - 1). Fewer steps keep the full sweep
+    /// affordable inside the fuzz loop.
+    /// forge-config: default.fuzz.runs = 300
+    function testFuzz_EveryPastRoundStaysImmutable(uint256 seed, uint8 rawSteps) external {
+        uint256 steps = (uint256(rawSteps) % 6) + 1;
+        RoundHistoryUint256SetHarness harness = new RoundHistoryUint256SetHarness();
+        uint256[] memory domain = _domain();
+        uint256[] memory model = new uint256[](DOMAIN);
+        uint256 modelLen = 0;
+        Snapshots memory snaps = Snapshots({
+            rounds: new uint256[](6),
+            lens: new uint256[](6),
+            flat: new uint256[](6 * DOMAIN),
+            count: 0
+        });
+        uint256 rng = seed;
+        uint256 round = 0;
+        bool ok = true;
+
+        for (uint256 s = 0; s < steps; s++) {
+            rng = _next(rng);
+            round += rng % 4;
+            rng = _next(rng);
+            uint256 value = rng % DOMAIN;
+            rng = _next(rng);
+            if (rng % 2 == 0) {
+                // forge-lint: disable-next-line(calls-loop)
+                harness.add(round, value);
+                modelLen = _modelAdd(model, modelLen, value);
+            } else {
+                // forge-lint: disable-next-line(calls-loop)
+                harness.remove(round, value);
+                modelLen = _modelRemove(model, modelLen, value);
+            }
+            _snapWrite(snaps, round, model, modelLen);
+
+            // Every plateau boundary must still read its own snapshot after the later writes.
+            for (uint256 k = 0; k < snaps.count; k++) {
+                RhProbe memory past = harness.probe(snaps.rounds[k], domain); // forge-lint: disable-line(calls-loop)
+                if (!_roundOk(past, domain, snaps, snaps.rounds[k])) ok = false;
+            }
+            // ... and so must the round just before the current one.
+            if (round > 0) {
+                RhProbe memory before = harness.probe(round - 1, domain); // forge-lint: disable-line(calls-loop)
+                if (!_roundOk(before, domain, snaps, round - 1)) ok = false;
+            }
+        }
+
+        require(ok, "a past round changed after later writes");
     }
 
     /// Same-round hammering: many operations inside a single round must only keep that round's final

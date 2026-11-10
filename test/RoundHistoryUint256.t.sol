@@ -140,6 +140,35 @@ contract RoundHistoryUint256Test {
         require(harness.value(1) == 0);
     }
 
+    /// The README documents that `increase`/`decrease` on an earlier round revert whether or not that
+    /// round was recorded; pin the full payload for both directions.
+    function testArithmeticHelpersOnEarlierRoundRevert() external {
+        RoundHistoryUint256Harness harness = new RoundHistoryUint256Harness();
+        harness.record(1, 100);
+        harness.record(5, 100);
+
+        (bool ok, bytes memory reason) =
+            address(harness).call(abi.encodeWithSelector(harness.increase.selector, uint256(3), uint256(1)));
+        require(!ok, "increase on an earlier round must revert");
+        _requireInvalidKeyOrder(reason, 3, 5);
+
+        (ok, reason) = address(harness).call(abi.encodeWithSelector(harness.decrease.selector, uint256(3), uint256(1)));
+        require(!ok, "decrease on an earlier round must revert");
+        _requireInvalidKeyOrder(reason, 3, 5);
+    }
+
+    /// Overflow through the *push* branch (a new round inheriting the maximum), not just the
+    /// same-round overwrite covered above.
+    function testIncreaseAtNewRoundInheritingMaximumReverts() external {
+        RoundHistoryUint256Harness harness = new RoundHistoryUint256Harness();
+        harness.record(1, type(uint256).max);
+
+        (bool ok, bytes memory reason) =
+            address(harness).call(abi.encodeWithSelector(harness.increase.selector, uint256(2), uint256(1)));
+        require(!ok, "increase past the maximum at a new round must revert");
+        _requireArithmeticPanic(reason);
+    }
+
     /// Decodes the `Panic(uint256)` payload and asserts the code, not only the selector: a
     /// selector-only check would also accept `Panic(0x01)` from an `assert`.
     function _requireArithmeticPanic(bytes memory reason) private pure {
@@ -147,6 +176,17 @@ contract RoundHistoryUint256Test {
         // forge-lint: disable-next-line(unsafe-typecast)
         require(bytes4(reason) == bytes4(0x4e487b71), "not a Panic");
         require(abi.decode(_payload(reason), (uint256)) == 0x11, "not an arithmetic panic");
+    }
+
+    /// Asserts the full `InvalidKeyOrder` payload so swapped operands fail too.
+    function _requireInvalidKeyOrder(bytes memory reason, uint256 expectedKey, uint256 expectedLastKey) private pure {
+        require(
+            keccak256(reason)
+                == keccak256(
+                    abi.encodeWithSelector(OrderedHistoryIndex.InvalidKeyOrder.selector, expectedKey, expectedLastKey)
+                ),
+            "unexpected revert payload"
+        );
     }
 
     /// Strips the four-byte selector so the arguments can be `abi.decode`d.
