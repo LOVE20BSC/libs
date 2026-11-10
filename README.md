@@ -124,7 +124,7 @@ Tracks `string[]` values across rounds, with the same inheritance semantics as `
 
 ### RoundHistoryUint256Set
 
-Tracks a **set** of `uint256` values across rounds, replacing the legacy `RoundHistoryAddressSet` with `uint256` elements. Three histories are kept: the set size, `slot -> element`, and `element -> slot + 1` (`0` meaning "not in the set"). The current state is derived from these histories' `latestValue()`, so there is no second copy that could drift out of sync.
+Tracks a **set** of `uint256` values across rounds, replacing the legacy `RoundHistoryAddressSet` — which lives in an external repository, not in this one — with `uint256` elements. Three histories are kept: the set size, `slot -> element`, and `element -> slot + 1` (`0` meaning "not in the set"). The current state is derived from these histories' `latestValue()`, so there is no second copy that could drift out of sync.
 
 Writes require a non-decreasing `round` (same constraint as `RoundHistoryUint256`); re-recording the same round keeps only that round's final value. Removal is swap-and-pop, so the order guarantee matches `Uint256Set`: an `offset` is not stable across calls, and enumeration is paginated only (`contains`/`count` are O(1) reads of the latest recorded value; `containsByRound`/`countByRound` are point queries that are O(1) on an exact round hit and fall back to a binary search — O(log rounds) — otherwise; none of them is a second enumeration path).
 
