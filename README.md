@@ -83,8 +83,8 @@ Tracks `uint256` values across rounds with arithmetic operations.
 - `record(uint256 round, uint256 value)` - Record a value at a round
 - `value(uint256 round)` - Get value at round (uses nearest if not exact)
 - `latestValue()` - Get the most recent value
-- `increase(uint256 round, uint256 amount)` - Add to current value
-- `decrease(uint256 round, uint256 amount)` - Subtract from current value; reverts if the current value is smaller than `amount`
+- `increase(uint256 round, uint256 amount)` - Add to the value in force at `round`. `round` must be at least the latest recorded round: re-recording the latest round overwrites it, while an earlier round — recorded or not — reverts with `InvalidKeyOrder`
+- `decrease(uint256 round, uint256 amount)` - Subtract from the value in force at `round`, under the same round constraint; reverts if the current value is smaller than `amount`
 
 ### RoundHistoryString
 
