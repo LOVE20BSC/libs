@@ -2,7 +2,7 @@
 
 ## OrderedHistoryIndex
 
-`OrderedHistoryIndex` stores ordered change-point keys. New keys must increase; re-recording the latest key is allowed, while older keys revert. Values remain in the consuming contract's typed storage.
+`OrderedHistoryIndex` stores ordered change-point keys. New keys must increase; re-recording the latest key is allowed, while older keys revert. Values remain in the consuming contract's typed storage. A decreasing key is a caller-input error rather than a broken invariant, so it reverts with the named `InvalidKeyOrder` carrying both keys instead of failing through an `assert`: a `Panic(0x01)` is what a genuine internal failure raises too and carries no operands, so from the revert data alone a caller cannot tell a mis-ordered write from a broken library.
 
 Because the index only appends, a key written *ahead* of the current round moves the tip immediately and cannot be undone: every later write at a key below it reverts with `InvalidKeyOrder`, so the rounds in between can never be recorded, and `latest()` — hence every `latestValue()` derived from it — already reports the future key's value. Writers must therefore take the key from one monotonically non-decreasing source; "greater than the last key" is not a sufficient test. The constraint is not enforceable by the library, since it depends on what the caller's round means.
 
@@ -46,7 +46,7 @@ Membership and position share one mapping `indexPlusOne`, encoding `index + 1` s
 - `remove(uint256 value)` - Swap-and-pop removal; returns whether the element was actually removed (`false` when absent, no state change, no revert)
 - `contains(uint256 value)` - O(1) membership check
 - `count()` - Number of elements
-- `clear()` - Remove every element; the only correct way to empty the set (see below)
+- `clear()` - Remove every element; the only correct way to empty the set (see below). O(n) in `items`
 - `values(uint256 offset, uint256 limit, bool reverse)` - Paginated page and real total
 
 `clear()` exists because the storage struct cannot be reset with `delete`: in Solidity `delete` empties the dynamic array but leaves the `indexPlusOne` mapping untouched, which desynchronises the two representations — `count()` reads zero while `contains()` still answers `true`, and a later `remove` of a stale element underflows. `clear()` walks `items` and deletes each entry before emptying the array.
@@ -64,7 +64,7 @@ Membership and position share one mapping `indexPlusOne`, encoding `index + 1` s
 - `remove(address value)` - Swap-and-pop removal; returns whether the element was actually removed (`false` when absent, no state change, no revert)
 - `contains(address value)` - O(1) membership check
 - `count()` - Number of elements
-- `clear()` - Remove every element; the only correct way to empty the set (see below)
+- `clear()` - Remove every element; the only correct way to empty the set (see below). O(n) in `items`
 - `values(uint256 offset, uint256 limit, bool reverse)` - Paginated page and real total
 
 `clear()` exists because the storage struct cannot be reset with `delete`: in Solidity `delete` empties the dynamic array but leaves the `indexPlusOne` mapping untouched, which desynchronises the two representations — `count()` reads zero while `contains()` still answers `true`, and a later `remove` of a stale element underflows. `clear()` walks `items` and deletes each entry before emptying the array.
