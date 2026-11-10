@@ -6,8 +6,6 @@ import {Pagination} from "./Pagination.sol";
 library AddressSet {
     using Pagination for address[];
 
-    // `delete` cannot reset this struct: it empties `items` but leaves `indexPlusOne` behind, so
-    // `contains` would stay true while `count` reads zero. Use `clear` instead.
     struct Storage {
         address[] items;
         // element => index + 1; 0 means absent
@@ -38,7 +36,6 @@ library AddressSet {
         return true;
     }
 
-    // Iterates `items` because `delete` alone cannot reach into the mapping. O(n).
     function clear(Storage storage self) internal {
         uint256 length = self.items.length;
         for (uint256 i = 0; i < length; i++) {

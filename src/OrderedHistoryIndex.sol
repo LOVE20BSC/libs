@@ -7,10 +7,6 @@ library OrderedHistoryIndex {
         mapping(uint256 => bool) recorded;
     }
 
-    /// @dev A decreasing key is caller input, not a broken invariant, so it is reported as a named
-    /// error rather than an `assert` panic. `Panic(0x01)` is what a genuine internal failure raises
-    /// too, and it carries no operands, so from the revert data alone a caller cannot tell a
-    /// mis-ordered write from a broken library.
     error InvalidKeyOrder(uint256 key, uint256 lastKey);
 
     function record(Index storage self, uint256 key) internal {
