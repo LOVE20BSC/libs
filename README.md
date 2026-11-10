@@ -162,6 +162,6 @@ Collections here expose every enumeration through `Pagination` and never through
 
 `forge lint` is a build gate here, as in core and action: the post-build lint step fails on any finding, so a clean `forge build` implies a clean lint. Production sources are linted in full.
 
-`[lint] ignore` covers `test/**/*.sol` only. The harnesses expose the set API verbatim, and the state-machine and differential loops call `add` / `remove` for their state effects alone, dropping the `bool` return; without the ignore those call sites raise `unused-return` and the build fails.
+`[lint] ignore` covers `test/**/*.sol` only. The harnesses expose the set API verbatim, so every test that calls `add` / `remove` for its state effect alone drops the `bool` return and raises `unused-return` — that is most of the one-call unit tests as well as the state-machine and differential loops, 136 findings in total. Without the ignore the build fails.
 
 One difference from the sibling repos: core, action and group-chat also `exclude_lints` `unused-return`, which switches that rule off for their production sources too. Here it stays on for `src`, and only test files are skipped.
