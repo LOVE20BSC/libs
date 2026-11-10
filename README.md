@@ -97,7 +97,7 @@ Tracks `string` values across rounds.
 
 ### RoundHistoryAddress
 
-Tracks `address` values across rounds.
+Tracks `address` values across rounds. It is the scalar `address` partner of `RoundHistoryString` and is kept for symmetry, but nothing in the owning workspace imports it: `core`, `action` and `group-chat` all use the other history types. It is covered only by its own suite, so treat it as available-but-unexercised rather than battle-tested.
 
 **API:**
 - `record(uint256 round, address value)` - Record an address at a round
