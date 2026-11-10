@@ -123,6 +123,29 @@ contract MirrorParityTest {
         }
     }
 
+    /// Values the byte-sized `DOMAIN` never reaches: both ends of the address range, and a set that
+    /// grows past `DOMAIN`, so a drift that only appears above 8 elements is still caught.
+    function testWideValuesStayInStep() external {
+        (Uint256SetProbe u, AddressSetProbe a) = _fresh();
+
+        uint256[6] memory wide = [uint256(0), 255, 256, 65535, type(uint160).max - 1, type(uint160).max];
+        for (uint256 i = 0; i < wide.length; i++) {
+            _assertAddInStep(u, a, wide[i]);
+            _assertInStep(u, a);
+        }
+
+        for (uint256 i = 0; i < 12; i++) {
+            _assertAddInStep(u, a, 1000 + i);
+        }
+        _assertInStep(u, a);
+
+        // Draining is where the sentinel encoding is most exposed.
+        for (uint256 i = 0; i < wide.length; i++) {
+            _assertRemoveInStep(u, a, wide[i]);
+            _assertInStep(u, a);
+        }
+    }
+
     function _fresh() private returns (Uint256SetProbe u, AddressSetProbe a) {
         u = new Uint256SetProbe();
         a = new AddressSetProbe();
@@ -147,18 +170,37 @@ contract MirrorParityTest {
             require(u.contains(i) == a.contains(_asAddress(i)), "contains diverged");
         }
 
-        (uint256[] memory forward, uint256 forwardTotal) = u.values(0, type(uint256).max, false);
-        (address[] memory mirrorForward, uint256 mirrorForwardTotal) = a.values(0, type(uint256).max, false);
-        require(forwardTotal == mirrorForwardTotal && forward.length == mirrorForward.length, "forward page diverged");
-        for (uint256 i = 0; i < forward.length; i++) {
-            require(_asAddress(forward[i]) == mirrorForward[i], "forward entry diverged");
-        }
+        // Offset and limit are as much part of the window contract as the direction, and a drift in
+        // either stays invisible if every read pins offset to 0 and limit to max. Sweep the windows a
+        // consumer actually passes, in both directions, including both edges.
+        _assertWindowInStep(u, a, 0, type(uint256).max, false);
+        _assertWindowInStep(u, a, 0, type(uint256).max, true);
+        _assertWindowInStep(u, a, 1, type(uint256).max, false);
+        _assertWindowInStep(u, a, 1, type(uint256).max, true);
+        _assertWindowInStep(u, a, 0, 2, false);
+        _assertWindowInStep(u, a, 0, 2, true);
+        _assertWindowInStep(u, a, 2, 3, false);
+        _assertWindowInStep(u, a, 2, 3, true);
+        _assertWindowInStep(u, a, 0, 0, false);
+        _assertWindowInStep(u, a, total, 4, false);
+        _assertWindowInStep(u, a, total, 4, true);
+        _assertWindowInStep(u, a, total + 1, 4, true);
+    }
 
-        (uint256[] memory backward,) = u.values(0, type(uint256).max, true);
-        (address[] memory mirrorBackward,) = a.values(0, type(uint256).max, true);
-        require(backward.length == mirrorBackward.length, "reverse page diverged");
-        for (uint256 i = 0; i < backward.length; i++) {
-            require(_asAddress(backward[i]) == mirrorBackward[i], "reverse entry diverged");
+    /// Compares a single window, in one direction, across both libraries.
+    function _assertWindowInStep(
+        Uint256SetProbe u,
+        AddressSetProbe a,
+        uint256 offset,
+        uint256 limit,
+        bool reverse
+    ) private view {
+        (uint256[] memory page, uint256 total) = u.values(offset, limit, reverse);
+        (address[] memory mirrorPage, uint256 mirrorTotal) = a.values(offset, limit, reverse);
+        require(total == mirrorTotal, "window total diverged");
+        require(page.length == mirrorPage.length, "window size diverged");
+        for (uint256 i = 0; i < page.length; i++) {
+            require(_asAddress(page[i]) == mirrorPage[i], "window entry diverged");
         }
     }
 
