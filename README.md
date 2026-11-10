@@ -4,6 +4,8 @@
 
 `OrderedHistoryIndex` stores ordered change-point keys. New keys must increase; re-recording the latest key is allowed, while older keys revert. Values remain in the consuming contract's typed storage.
 
+Because the index only appends, a key written *ahead* of the current round moves the tip immediately and cannot be undone: every later write at a key below it reverts with `InvalidKeyOrder`, so the rounds in between can never be recorded, and `latest()` — hence every `latestValue()` derived from it — already reports the future key's value. Writers must therefore take the key from one monotonically non-decreasing source; "greater than the last key" is not a sufficient test. The constraint is not enforceable by the library, since it depends on what the caller's round means.
+
 `nearest` and `latest` return `(bool found, uint256 key)`. `found = false` means no recorded key satisfies the query — an empty index, or a target below the first key — which is what lets the typed histories tell "no record" apart from a recorded zero.
 
 **API:**
