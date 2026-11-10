@@ -714,6 +714,12 @@ contract RoundHistoryUint256SetTest {
         ok = p.totalAtRound == len && p.itemsAtRound.length == len;
         for (uint256 i = 0; i < p.itemsAtRound.length; i++) {
             if (!_snapContains(s, base, len, p.itemsAtRound[i])) ok = false;
+            // Membership alone would accept a window that repeats one member while dropping
+            // another: every entry is checked to be in the snapshot, but nothing yet forced the
+            // window to be a permutation of it. Size equality plus distinctness does.
+            for (uint256 j = i + 1; j < p.itemsAtRound.length; j++) {
+                if (p.itemsAtRound[i] == p.itemsAtRound[j]) ok = false;
+            }
         }
         for (uint256 i = 0; i < domain.length; i++) {
             if (p.domainContainsAtRound[i] != _snapContains(s, base, len, domain[i])) ok = false;
