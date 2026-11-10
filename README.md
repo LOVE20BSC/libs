@@ -6,7 +6,9 @@
 
 Because the index only appends, a key written *ahead* of the current round moves the tip immediately and cannot be undone: every later write at a key below it reverts with `InvalidKeyOrder`, so the rounds in between can never be recorded, and `latest()` — hence every `latestValue()` derived from it — already reports the future key's value. Writers must therefore take the key from one monotonically non-decreasing source; "greater than the last key" is not a sufficient test. The constraint is not enforceable by the library, since it depends on what the caller's round means.
 
-`nearest` and `latest` return `(bool found, uint256 key)`. `found = false` means no recorded key satisfies the query — an empty index, or a target below the first key — which is what lets the typed histories tell "no record" apart from a recorded zero.
+`nearest` and `latest` return `(bool found, uint256 key)`. `found = false` means no recorded key satisfies the query — an empty index, or a target below the first key.
+
+That flag stops at the index. The typed histories discard it and return the type's default (`0`, `address(0)`, `""`, empty array) both for "no record at or before this round" and for a recorded default value, so **the two cases are not distinguishable through `RoundHistory*.value` / `values`**. Reading `value(round) == 0` as "no record" is therefore wrong: it also fires for a legitimately recorded zero and for every later round that inherits one. A caller that needs the distinction must ask the index itself (`OrderedHistoryIndex.contains` / `nearest` on the same `History`) instead of inferring it from the returned value.
 
 **API:**
 - `record(uint256 key)` - Record a new key (must be >= last key; older keys revert with `InvalidKeyOrder`)
