@@ -91,8 +91,14 @@ contract RoundHistoryUint256ArrayTest {
         try harness.record(3, _single(2)) {
             revert("expected InvalidKeyOrder");
         } catch (bytes memory reason) {
-            // forge-lint: disable-next-line(unsafe-typecast)
-            require(bytes4(reason) == OrderedHistoryIndex.InvalidKeyOrder.selector);
+            // The whole payload is pinned, so swapped operands fail too: the expected error is
+            // InvalidKeyOrder(3, 5).
+            require(
+                keccak256(reason)
+                    == keccak256(
+                        abi.encodeWithSelector(OrderedHistoryIndex.InvalidKeyOrder.selector, uint256(3), uint256(5))
+                    )
+            );
         }
     }
 
