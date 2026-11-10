@@ -7,8 +7,8 @@ library AddressSet {
     using Pagination for address[];
 
     // `delete` cannot reset this struct: it empties `items` but leaves `indexPlusOne` behind, so
-// `contains` would stay true while `count` reads zero. Use `clear` instead.
-struct Storage {
+    // `contains` would stay true while `count` reads zero. Use `clear` instead.
+    struct Storage {
         address[] items;
         // element => index + 1; 0 means absent
         mapping(address => uint256) indexPlusOne;

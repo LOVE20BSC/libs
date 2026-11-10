@@ -154,8 +154,8 @@ contract MirrorParityTest {
             require(_asAddress(forward[i]) == mirrorForward[i], "forward entry diverged");
         }
 
-        (uint256[] memory backward, ) = u.values(0, type(uint256).max, true);
-        (address[] memory mirrorBackward, ) = a.values(0, type(uint256).max, true);
+        (uint256[] memory backward,) = u.values(0, type(uint256).max, true);
+        (address[] memory mirrorBackward,) = a.values(0, type(uint256).max, true);
         require(backward.length == mirrorBackward.length, "reverse page diverged");
         for (uint256 i = 0; i < backward.length; i++) {
             require(_asAddress(backward[i]) == mirrorBackward[i], "reverse entry diverged");

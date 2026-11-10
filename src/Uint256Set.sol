@@ -7,8 +7,8 @@ library Uint256Set {
     using Pagination for uint256[];
 
     // `delete` cannot reset this struct: it empties `items` but leaves `indexPlusOne` behind, so
-// `contains` would stay true while `count` reads zero. Use `clear` instead.
-struct Storage {
+    // `contains` would stay true while `count` reads zero. Use `clear` instead.
+    struct Storage {
         uint256[] items;
         // element => index + 1; 0 means absent
         mapping(uint256 => uint256) indexPlusOne;
