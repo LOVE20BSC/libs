@@ -2,6 +2,7 @@
 pragma solidity =0.8.37;
 
 import {OrderedHistoryIndex} from "../src/OrderedHistoryIndex.sol";
+import {IOrderedHistoryIndexErrors} from "../src/interfaces/IOrderedHistoryIndexErrors.sol";
 
 contract OrderedHistoryIndexHarness {
     using OrderedHistoryIndex for OrderedHistoryIndex.Index;
@@ -58,7 +59,7 @@ contract OrderedHistoryIndexTest {
             require(
                 keccak256(reason)
                     == keccak256(
-                        abi.encodeWithSelector(OrderedHistoryIndex.InvalidKeyOrder.selector, uint256(15), uint256(20))
+                        abi.encodeWithSelector(IOrderedHistoryIndexErrors.InvalidKeyOrder.selector, uint256(15), uint256(20))
                     )
             );
         }

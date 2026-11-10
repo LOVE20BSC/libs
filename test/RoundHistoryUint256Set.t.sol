@@ -3,7 +3,7 @@ pragma solidity =0.8.37;
 
 import {RoundHistoryUint256Set} from "../src/RoundHistoryUint256Set.sol";
 import {RoundHistoryUint256} from "../src/RoundHistoryUint256.sol";
-import {OrderedHistoryIndex} from "../src/OrderedHistoryIndex.sol";
+import {IOrderedHistoryIndexErrors} from "../src/interfaces/IOrderedHistoryIndexErrors.sol";
 
 /// Bundle returned by `RoundHistoryUint256SetHarness.probe`, shared with the test contract.
 struct RhProbe {
@@ -579,7 +579,7 @@ contract RoundHistoryUint256SetTest {
             require(
                 keccak256(reason)
                     == keccak256(
-                        abi.encodeWithSelector(OrderedHistoryIndex.InvalidKeyOrder.selector, uint256(3), uint256(5))
+                        abi.encodeWithSelector(IOrderedHistoryIndexErrors.InvalidKeyOrder.selector, uint256(3), uint256(5))
                     )
             );
         }
@@ -596,7 +596,7 @@ contract RoundHistoryUint256SetTest {
             require(
                 keccak256(reason)
                     == keccak256(
-                        abi.encodeWithSelector(OrderedHistoryIndex.InvalidKeyOrder.selector, uint256(3), uint256(5))
+                        abi.encodeWithSelector(IOrderedHistoryIndexErrors.InvalidKeyOrder.selector, uint256(3), uint256(5))
                     )
             );
         }

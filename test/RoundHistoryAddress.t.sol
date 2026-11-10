@@ -2,7 +2,7 @@
 pragma solidity =0.8.37;
 
 import {RoundHistoryAddress} from "../src/RoundHistoryAddress.sol";
-import {OrderedHistoryIndex} from "../src/OrderedHistoryIndex.sol";
+import {IOrderedHistoryIndexErrors} from "../src/interfaces/IOrderedHistoryIndexErrors.sol";
 
 contract RoundHistoryAddressHarness {
     using RoundHistoryAddress for RoundHistoryAddress.History;
@@ -75,7 +75,7 @@ contract RoundHistoryAddressTest {
             require(
                 keccak256(reason)
                     == keccak256(
-                        abi.encodeWithSelector(OrderedHistoryIndex.InvalidKeyOrder.selector, uint256(3), uint256(5))
+                        abi.encodeWithSelector(IOrderedHistoryIndexErrors.InvalidKeyOrder.selector, uint256(3), uint256(5))
                     )
             );
         }

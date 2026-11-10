@@ -2,7 +2,7 @@
 pragma solidity =0.8.37;
 
 import {RoundHistoryUint256} from "../src/RoundHistoryUint256.sol";
-import {OrderedHistoryIndex} from "../src/OrderedHistoryIndex.sol";
+import {IOrderedHistoryIndexErrors} from "../src/interfaces/IOrderedHistoryIndexErrors.sol";
 
 contract RoundHistoryUint256Harness {
     using RoundHistoryUint256 for RoundHistoryUint256.History;
@@ -121,7 +121,7 @@ contract RoundHistoryUint256Test {
             require(
                 keccak256(reason)
                     == keccak256(
-                        abi.encodeWithSelector(OrderedHistoryIndex.InvalidKeyOrder.selector, uint256(3), uint256(5))
+                        abi.encodeWithSelector(IOrderedHistoryIndexErrors.InvalidKeyOrder.selector, uint256(3), uint256(5))
                     )
             );
         }
@@ -183,7 +183,7 @@ contract RoundHistoryUint256Test {
         require(
             keccak256(reason)
                 == keccak256(
-                    abi.encodeWithSelector(OrderedHistoryIndex.InvalidKeyOrder.selector, expectedKey, expectedLastKey)
+                    abi.encodeWithSelector(IOrderedHistoryIndexErrors.InvalidKeyOrder.selector, expectedKey, expectedLastKey)
                 ),
             "unexpected revert payload"
         );

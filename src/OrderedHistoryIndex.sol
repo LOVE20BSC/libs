@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.37;
 
+import {IOrderedHistoryIndexErrors} from "./interfaces/IOrderedHistoryIndexErrors.sol";
+
 library OrderedHistoryIndex {
     struct Index {
         uint256[] keys;
         mapping(uint256 => bool) recorded;
     }
-
-    error InvalidKeyOrder(uint256 key, uint256 lastKey);
 
     function record(Index storage self, uint256 key) internal {
         uint256 length = self.keys.length;
@@ -23,7 +23,7 @@ library OrderedHistoryIndex {
             self.recorded[key] = true;
             return;
         }
-        if (key != lastKey) revert InvalidKeyOrder(key, lastKey);
+        if (key != lastKey) revert IOrderedHistoryIndexErrors.InvalidKeyOrder(key, lastKey);
     }
 
     function contains(Index storage self, uint256 key) internal view returns (bool) {
