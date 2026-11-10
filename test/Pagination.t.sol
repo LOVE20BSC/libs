@@ -363,4 +363,30 @@ contract PaginationTest {
         uint256[] memory indices = harness.indicesPage(0, offset, limit, reverse);
         require(indices.length == 0);
     }
+
+    /// Raw window words, without the modulo domains above: `offset`/`limit` may be
+    /// `type(uint256).max`-scale, which the bounded fuzz domains can never reach. The expected size is
+    /// still counted, not restated.
+    function testFuzz_RawWindowWordsStayInContract(
+        uint256 countRaw,
+        uint256 offset,
+        uint256 limit,
+        bool reverse
+    ) external {
+        uint256 count = countRaw % 9;
+        PaginationHarness harness = _filled(count);
+        uint256 expectedSize = _windowSize(count, offset, limit);
+
+        (uint256[] memory values, uint256 total) = harness.valuePage(offset, limit, reverse);
+        require(total == count, "total is the collection size");
+        require(values.length == expectedSize, "raw window size (uint256)");
+
+        (address[] memory addresses, uint256 addressTotal) = harness.addressPage(offset, limit, reverse);
+        require(addressTotal == count, "total is the collection size");
+        require(addresses.length == expectedSize, "raw window size (address)");
+
+        uint256[] memory indices = harness.indicesPage(count, offset, limit, reverse);
+        require(indices.length == expectedSize, "raw window size (indices)");
+        require(Pagination.pageCount(count, offset, limit) == expectedSize, "pageCount");
+    }
 }
