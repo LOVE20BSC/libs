@@ -114,6 +114,14 @@ contract RoundHistoryUint256SetTest {
         require(page[1] == b);
     }
 
+    function _expect4(uint256[] memory page, uint256 a, uint256 b, uint256 c, uint256 d) private pure {
+        require(page.length == 4);
+        require(page[0] == a);
+        require(page[1] == b);
+        require(page[2] == c);
+        require(page[3] == d);
+    }
+
     function _expect1(uint256[] memory page, uint256 a) private pure {
         require(page.length == 1);
         require(page[0] == a);
@@ -196,6 +204,72 @@ contract RoundHistoryUint256SetTest {
         require(harness.countByRound(2) == 2);
         require(harness.containsByRound(30, 2));
         require(!harness.containsByRound(20, 2));
+    }
+
+    /// A past round is a fixed slot snapshot: a forward page walks slots in ascending order and a
+    /// reverse page walks the same snapshot backwards. `testSnapshotAcrossRounds` only pins two
+    /// elements; this pins four-element snapshots through later swap-and-pop churn, so a window that
+    /// permutes a valid set is caught (the fuzz model in `_roundOk` compares membership, not order).
+    function testPastRoundSnapshotKeepsSlotOrder() external {
+        RoundHistoryUint256SetHarness harness = new RoundHistoryUint256SetHarness();
+        harness.add(1, 10);
+        harness.add(1, 20);
+        harness.add(1, 30);
+        harness.add(1, 40);
+
+        // Round 1 leaves slots [10, 20, 30, 40].
+        // Round 2 removes 20: 40 swaps into slot 1 and slot 3 is zeroed -> [10, 40, 30].
+        harness.remove(2, 20);
+        // Round 3 appends 50 at slot 3 -> [10, 40, 30, 50].
+        harness.add(3, 50);
+        // Round 4 removes 10: 50 swaps into slot 0 and slot 3 is zeroed -> [50, 40, 30].
+        harness.remove(4, 10);
+        // Round 5 appends 60 at slot 3 -> [50, 40, 30, 60].
+        harness.add(5, 60);
+
+        (uint256[] memory page, uint256 total) = harness.valuesByRound(1, 0, type(uint256).max, false);
+        _expect4(page, 10, 20, 30, 40);
+        require(total == 4);
+
+        // The same snapshot read through a sub-window stays in slot order.
+        (page, total) = harness.valuesByRound(1, 1, 2, false);
+        _expect2(page, 20, 30);
+        require(total == 4);
+
+        (page, total) = harness.valuesByRound(1, 0, type(uint256).max, true);
+        _expect4(page, 40, 30, 20, 10);
+        require(total == 4);
+
+        (page, total) = harness.valuesByRound(1, 1, 2, true);
+        _expect2(page, 30, 20);
+        require(total == 4);
+
+        // Round 3 is also past now; it shows that round's swap-and-pop layout, not insertion order.
+        (page, total) = harness.valuesByRound(3, 0, type(uint256).max, false);
+        _expect4(page, 10, 40, 30, 50);
+        require(total == 4);
+
+        (page, total) = harness.valuesByRound(3, 0, type(uint256).max, true);
+        _expect4(page, 50, 30, 40, 10);
+        require(total == 4);
+
+        (page, total) = harness.valuesByRound(3, 0, 2, false);
+        _expect2(page, 10, 40);
+        require(total == 4);
+
+        (page, total) = harness.valuesByRound(3, 2, 2, false);
+        _expect2(page, 30, 50);
+        require(total == 4);
+
+        // Later writes must not move either snapshot.
+        harness.remove(6, 40);
+        harness.add(7, 70);
+        (page, total) = harness.valuesByRound(1, 0, type(uint256).max, false);
+        _expect4(page, 10, 20, 30, 40);
+        require(total == 4);
+        (page, total) = harness.valuesByRound(3, 0, type(uint256).max, false);
+        _expect4(page, 10, 40, 30, 50);
+        require(total == 4);
     }
 
     function testLaterRemovalKeepsHistory() external {
@@ -745,9 +819,10 @@ contract RoundHistoryUint256SetTest {
             // another: every entry is checked to be in the snapshot, but nothing yet forced the
             // window to be a permutation of it. Size equality plus distinctness does.
             //
-            // Order is deliberately not modelled. Removal is swap-and-pop and the README states that
-            // an `offset` is not stable across calls, so the slot order carries no guarantee; a
-            // permutation that still yields a permutation of the round's set is in contract.
+            // Order is not modelled here: removal is swap-and-pop while this model compacts
+            // stably, so the model cannot predict the library's slot layout without tracking the
+            // swaps itself. A past round's page order is fixed, though, and is pinned separately
+            // by `testPastRoundSnapshotKeepsSlotOrder`.
             for (uint256 j = i + 1; j < p.itemsAtRound.length; j++) {
                 if (p.itemsAtRound[i] == p.itemsAtRound[j]) ok = false;
             }
