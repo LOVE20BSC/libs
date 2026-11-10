@@ -51,11 +51,16 @@ contract OrderedHistoryIndexTest {
         require(harness.length() == 2);
 
         try harness.recordKey(15) {
-            revert("expected key order panic");
+            revert("expected InvalidKeyOrder");
         } catch (bytes memory reason) {
+            // The payload is decoded whole, not just matched by selector: a selector-only check
+            // would also accept any other `InvalidKeyOrder(key, lastKey)` pair.
+            require(reason.length == 4 + 64);
             // The revert payload is checked to contain at least four bytes by the test harness.
             // forge-lint: disable-next-line(unsafe-typecast)
-            require(bytes4(reason) == bytes4(0x4e487b71));
+            require(bytes4(reason) == OrderedHistoryIndex.InvalidKeyOrder.selector);
+            (uint256 key, uint256 lastKey) = abi.decode(_payload(reason), (uint256, uint256));
+            require(key == 15 && lastKey == 20);
         }
         require(harness.length() == 2);
     }
@@ -82,5 +87,13 @@ contract OrderedHistoryIndexTest {
         require(found && key == 0);
         (found, key) = harness.nearest(type(uint256).max - 1);
         require(found && key == 0);
+    }
+
+    /// Strips the four-byte selector so the arguments can be `abi.decode`d.
+    function _payload(bytes memory reason) private pure returns (bytes memory args) {
+        args = new bytes(reason.length - 4);
+        for (uint256 i = 0; i < args.length; i++) {
+            args[i] = reason[i + 4];
+        }
     }
 }

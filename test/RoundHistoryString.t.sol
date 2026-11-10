@@ -64,10 +64,10 @@ contract RoundHistoryStringTest {
         RoundHistoryStringHarness harness = new RoundHistoryStringHarness();
         harness.record(5, "data");
         try harness.record(3, "error") {
-            revert("expected key order panic");
+            revert("expected InvalidKeyOrder");
         } catch (bytes memory reason) {
             // forge-lint: disable-next-line(unsafe-typecast)
-            require(bytes4(reason) == bytes4(0x4e487b71));
+            require(bytes4(reason) == OrderedHistoryIndex.InvalidKeyOrder.selector);
         }
     }
 

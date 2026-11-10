@@ -7,14 +7,26 @@ library OrderedHistoryIndex {
         mapping(uint256 => bool) recorded;
     }
 
+    /// @dev A decreasing key is caller input, not a broken invariant, so it is reported as a named
+    /// error rather than an `assert` panic: a panic is indistinguishable from a library bug and
+    /// cannot be caught by selector.
+    error InvalidKeyOrder(uint256 key, uint256 lastKey);
+
     function record(Index storage self, uint256 key) internal {
         uint256 length = self.keys.length;
-        if (length == 0 || key > self.keys[length - 1]) {
+        if (length == 0) {
             self.keys.push(key);
             self.recorded[key] = true;
-        } else {
-            assert(key == self.keys[length - 1]);
+            return;
         }
+
+        uint256 lastKey = self.keys[length - 1];
+        if (key > lastKey) {
+            self.keys.push(key);
+            self.recorded[key] = true;
+            return;
+        }
+        if (key != lastKey) revert InvalidKeyOrder(key, lastKey);
     }
 
     function contains(Index storage self, uint256 key) internal view returns (bool) {
