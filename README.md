@@ -31,7 +31,7 @@ Shared pagination window used by every collection getter. A page is described by
 - `paginate(uint256[] storage items, uint256 offset, uint256 limit, bool reverse)` - Page of a `uint256[]` storage array.
 - `paginate(address[] storage items, uint256 offset, uint256 limit, bool reverse)` - Page of an `address[]` storage array.
 - `pageCount(uint256 total, uint256 offset, uint256 limit)` - Window size only; the shared math behind every page helper, for callers that only need the count.
-- `pageIndex(uint256 total, uint256 offset, uint256 i, bool reverse)` - Position of the `i`-th entry in the requested window; the shared index math.
+- `pageIndex(uint256 total, uint256 offset, uint256 i, bool reverse)` - Position of the `i`-th entry in the requested window; the shared index math. Precondition: `i < pageCount(total, offset, limit)`. The page helpers always satisfy it, but a direct caller that passes `i` past the window underflows in the reverse direction (`Panic(0x11)`) instead of clamping.
 
 The two `paginate` overloads return `(page, total)`; the window math lives once in `pageCount`/`pageIndex`, so the different element types only differ in what they copy out.
 
